@@ -1,0 +1,3 @@
+# Marsh
+
+Marsh is a lightweight, extensible Python library for building, managing, and executing command workflows. It allows users to chain multiple commands, define custom pre/post processing logic, and create flexible command grammars to structure CLI commands. With built-in support for local execution and an API for extending to remote, Docker-based, or Python expression execution, it simplifies automating workflows and integrating external processes. Whether you’re running shell commands, orchestrating pipelines, or customizing execution flows, Marsh provides a powerful and declarative way to streamline command management.
