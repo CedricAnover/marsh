@@ -1,9 +1,10 @@
 ## Description
 [Brief and concise description of the changes]
 
-## What kind of change did you make?
+## What kind of changes did you make?
 - [ ] Add new feature or enhancement (core or non-core components)?
 - [ ] Add or update extensions (non-core components)?
+- [ ] Refactor or optimize code?
 - [ ] Fix a bug?
 - [ ] Add or update the documentations?
 - [ ] Add or update the tests?
