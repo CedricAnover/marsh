@@ -129,12 +129,15 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
 .venv
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+!.env.sample
+!.env.*.sample
 
 # Spyder project settings
 .spyderproject
@@ -169,3 +172,9 @@ cython_debug/
 
 # VS Code
 .vscode
+
+# Nektos Act
+.secrets
+*.secrets
+.vars
+*.vars
