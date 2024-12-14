@@ -208,21 +208,25 @@ class CmdRunDecorator:
         Returns:
             Callable[[bytes, bytes], tuple[bytes, bytes]]: The decorated command runner function.
         """
-        # Apply pre-modifiers (before the command runner)
-        for pre_modifier in reversed(self._pre_modifiers):  # Reverse order for before-modifiers
-            cmd_runner = pre_modifier(cmd_runner)
-
+        # 2nd
         # Apply pre-processors (before the command runner)
         for pre_processor in reversed(self._pre_processors):  # Reverse order for before-processors
             cmd_runner = pre_processor(cmd_runner)
 
+        # 1st
+        # Apply pre-modifiers (before the command runner)
+        for pre_modifier in reversed(self._pre_modifiers):  # Reverse order for before-modifiers
+            cmd_runner = pre_modifier(cmd_runner)
+
         # # Wrap the command runner
         # cmd_runner = self._apply_cmd_runner(cmd_runner)
 
+        # 3rd
         # Apply post-modifiers (after the command runner)
         for post_modifier in self._post_modifiers:
             cmd_runner = post_modifier(cmd_runner)
 
+        # 4th
         # Apply post-processors (after the command runner)
         for post_processor in self._post_processors:
             cmd_runner = post_processor(cmd_runner)
