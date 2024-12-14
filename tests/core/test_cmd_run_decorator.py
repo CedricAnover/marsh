@@ -256,20 +256,23 @@ def test_cmd_run_decorator_add_processor_with_modifier(setup_cmd_run_decorator, 
         decorated_cmd_runner(b"", b"")
 
 
-def test_cmd_run_decorator_decorate_with_invalid_cmd_runner(setup_cmd_run_decorator):
+def test_cmd_run_decorator_decorate_with_invalid_cmd_runner_arguments(setup_cmd_run_decorator):
     cmd_run_decorator = setup_cmd_run_decorator
 
     # Invalid Signature
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         def invalid_cmd_runner(): pass  # Missing required arguments
-        cmd_run_decorator.decorate(invalid_cmd_runner)
+        decorated_cmd_runner = cmd_run_decorator.decorate(invalid_cmd_runner)
+        decorated_cmd_runner(b"", b"")
+
+
+def test_cmd_run_decorator_decorate_with_invalid_cmd_runner_return_value(setup_cmd_run_decorator):
+    cmd_run_decorator = setup_cmd_run_decorator
 
     def post_proc(inp_stdout, inp_stderr):
         print(inp_stdout, inp_stderr)
 
-    # TODO: Add Return Value Validation for command runners and modifiers.
-    # Invalid Return Value
-    with pytest.raises((ValueError, TypeError)):
+    with pytest.raises(ValueError):
         def invalid_return_cmd_runner(x_stdout, x_stderr):
             return x_stdout + x_stderr  # Not a tuple
         cmd_run_decorator.add_processor(post_proc, before=False)  # This should raise error as it requires (<bytes>, <bytes>)
