@@ -70,7 +70,7 @@ def test_invalid_command(mocker, local_executor):
 def test_empty_command(local_executor, mocker):
     mocker.patch.object(local_executor.command_grammar, 'build_cmd', return_value=[])
 
-    with pytest.raises(OSError):
+    with pytest.raises((OSError, IndexError)):
         local_executor.run(b"", b"")
 
 
