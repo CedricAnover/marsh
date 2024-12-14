@@ -1,7 +1,14 @@
 import subprocess
+from typing import Tuple, Any
+
 import pytest
 from pytest_mock import mocker
-from marsh import Executor, LocalCommandExecutor
+
+from marsh import (
+    Executor,
+    LocalCommandExecutor,
+    RemoteCommandExecutor
+)
 
 
 #==========================================================================================================
@@ -130,3 +137,69 @@ def test_invalid_callback_return(local_executor, mocker):
 
     with pytest.raises(ValueError):
         local_executor.run(b"", b"", callback=invalid_callback)
+
+#==========================================================================================================
+#============== RemoteCommandExecutor
+class MockExternalConnection:
+    def __init__(self):
+        self.is_connected = True
+
+    def run(self, command: str):
+        return command.encode(), b"mock_stderr"
+
+    def close(self):
+        self.is_connected = False
+
+
+@pytest.fixture
+def setup_remote_executor(mocker):
+    # Mock the RemoteCommandExecutor
+    mock_remote_executor = mocker.patch("marsh.core.executor.RemoteCommandExecutor", autospec=True)
+    remote_executor = mock_remote_executor.return_value
+
+    remote_executor.establish_connection.return_value = MockExternalConnection()
+
+    # Use side_effect for close_connection to ensure proper behavior
+    def mock_close_connection(connection, *args, **kwargs):
+        connection.close(*args, **kwargs)
+
+    remote_executor.close_connection.side_effect = mock_close_connection
+    remote_executor.execute_command.return_value = (b"mock_stdout", b"mock_stderr")
+
+    # Remind: Make sure to pass the remote_executor instance for `self`
+    remote_executor.run.side_effect = RemoteCommandExecutor.run
+
+    return remote_executor
+
+
+def test_remote_command_executor_establish_connection(setup_remote_executor):
+    remote_executor = setup_remote_executor
+    connection = remote_executor.establish_connection()
+    assert isinstance(connection, MockExternalConnection)
+    assert connection.is_connected is True
+
+
+def test_remote_command_executor_close_connection(setup_remote_executor):
+    remote_executor = setup_remote_executor
+    connection = remote_executor.establish_connection()
+    remote_executor.close_connection(connection)
+    assert connection.is_connected is False
+
+
+def test_remote_command_executor_execute_command(setup_remote_executor):
+    remote_executor = setup_remote_executor
+    connection = remote_executor.establish_connection()
+    stdout, stderr = remote_executor.execute_command(connection, b"", b"")
+    assert stdout == b"mock_stdout"
+    assert stderr == b"mock_stderr"
+
+
+def test_remote_command_executor_run(setup_remote_executor):
+    remote_executor = setup_remote_executor
+    connection = remote_executor.establish_connection()
+
+    assert connection.is_connected is True
+    stdout, stderr = remote_executor.run(remote_executor, b"", b"")
+    assert stdout == b"mock_stdout"
+    assert stderr == b"mock_stderr"
+    assert connection.is_connected is False
