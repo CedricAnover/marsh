@@ -305,6 +305,6 @@ def test_add_processors_and_modifiers_with_multiple_processors_and_modifiers_in_
 
     stdout, stderr = cmd_runner(b"stdout", b"stderr")
 
-    assert execution_order == ["proc1", "mod2", "proc2", "mod1"]
+    assert execution_order == ["mod2", "proc1", "mod1", "proc2"]
     assert stdout == b"stdout1"
     assert stderr == b"stderr2"
