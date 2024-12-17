@@ -2,6 +2,7 @@ import subprocess
 from abc import abstractmethod, ABC
 from typing import Callable, Tuple, Any
 
+from .connector import Connector
 from .command_grammar import CommandGrammar
 
 
@@ -154,106 +155,36 @@ class EnvCwdRelayExecutor(LocalCommandExecutor):
 
 
 class RemoteCommandExecutor(Executor):
-    """
-    Base class for executing commands on remote systems.
+    def __init__(self, connector: Connector, command_grammar: CommandGrammar):
+        self.connector = connector
+        self.command_grammar = command_grammar
 
-    The `RemoteCommandExecutor` serves as an abstract base class that provides the interface
-    for executing commands in remote environments. It manages the lifecycle of a remote connection
-    (establishment, execution, and cleanup) while delegating the implementation details of 
-    connection setup and command execution to its subclasses.
-
-    Subclasses should override:
-      - `establish_connection`: To set up the connection to the remote system.
-      - `execute_command`: To define how commands are executed on the remote system.
-      - `close_connection`: (Optional) To handle cleanup and closing of the remote connection.
-    """
-
-    @abstractmethod
-    def establish_connection(self, *args, **kwargs) -> Any | None:
-        """
-        Hook for subclasses to implement the logic for establishing a remote connection.
-
-        This method is called before executing the command. Subclasses may return a connection 
-        object that will be passed to `execute_command` and `close_connection`.
-
-        Args:
-            *args: Additional positional arguments for connection setup.
-            **kwargs: Additional keyword arguments for connection setup.
-
-        Returns:
-            Any | None: A connection object (e.g., SSH client, API session) or `None` 
-                        if no connection is required.
-        """
-        pass
-
-    def close_connection(self, connection: Any, *args, **kwargs) -> None:
-        """
-        Hook for subclasses to implement connection cleanup logic.
-
-        This method is called automatically after command execution to ensure resources 
-        are properly released. The implementation of `close_connection` can be optional
-        if the subclass would use context manager for establishing a remote connection.
-
-        Args:
-            connection (Any): The connection object returned by `establish_connection`.
-            *args: Additional positional arguments for connection cleanup.
-            **kwargs: Additional keyword arguments for connection cleanup.
-        """
-        pass  # Default: No connection cleanup needed.
-
-    @abstractmethod
-    def execute_command(self, connection: Any, x_stdout: bytes, x_stderr: bytes, *args, **kwargs) -> tuple[bytes, bytes]:
-        """
-        Abstract method to execute a command in the remote environment.
-
-        Subclasses must implement this method to define how commands are run remotely.
-        This is due to the fact that most external packages such as Paramiko or Fabric
-        would have a run or execute method attached to a connection object.
-
-        Args:
-            connection (Any): The connection object returned by `establish_connection`.
-            x_stdout (bytes): Standard output from a previous command runner.
-            x_stderr (bytes): Standard error from a previous command runner.
-            *args: Additional positional arguments for the command execution.
-            **kwargs: Additional keyword arguments for the command execution.
-
-        Returns:
-            tuple[bytes, bytes]: A tuple containing the standard output and standard error 
-                                 from the executed command.
-
-        Raises:
-            NotImplementedError: If not implemented in a subclass.
-        """
-        pass
-
-    def run(self, x_stdout: bytes, x_stderr: bytes, *args, **kwargs) -> tuple[bytes, bytes]:
-        """
-        Executes a command remotely, managing connection lifecycle.
-
-        This method follows a sequence of steps:
-            1. Calls `establish_connection` to set up the remote connection.
-            2. Passes the connection to `execute_command` to run the command.
-            3. Ensures `close_connection` is invoked for cleanup, even if execution fails.
-
-        Args:
-            x_stdout (bytes): Standard output to pass to the command.
-            x_stderr (bytes): Standard error to pass to the command.
-            *args: Additional positional arguments.
-            **kwargs: Additional keyword arguments.
-
-        Returns:
-            tuple[bytes, bytes]: A tuple containing the standard output and standard error 
-                                 from the executed command.
-        """
+    def run(self,
+            x_stdout: bytes,
+            x_stderr: bytes,
+            *build_cmd_args,
+            conn_args=(),
+            exec_cmd_args=(),
+            exec_cmd_kwargs=None,
+            conn_kwargs=None,
+            **build_cmd_kwargs,
+            ) -> tuple[bytes, bytes]:
+        exec_cmd_kwargs = exec_cmd_kwargs or dict()
+        conn_kwargs = conn_kwargs or dict()
         connection = None
         try:
-            # Establish connection if needed
-            connection = self.establish_connection(*args, **kwargs)
-            stdout, stderr = self.execute_command(connection, x_stdout, x_stderr, *args, **kwargs)
+            connection = self.connector.connect(*conn_args, **conn_kwargs)
+            stdout, stderr = self.connector.exec_cmd(
+                self.command_grammar.build_cmd(*build_cmd_args, **build_cmd_kwargs),
+                connection,
+                *exec_cmd_args,
+                **exec_cmd_kwargs
+            )
             return stdout, stderr
+        except Exception as e:
+            return b"", str(e).encode()
         finally:
-            # Ensure connection cleanup
-            self.close_connection(connection, *args, **kwargs)
+            self.connector.disconnect(connection)
 
 
 class DockerCommandExecutor(Executor):
