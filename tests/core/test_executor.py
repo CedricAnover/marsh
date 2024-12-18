@@ -152,54 +152,44 @@ class MockExternalConnection:
 
 
 @pytest.fixture
-def setup_remote_executor(mocker):
-    # Mock the RemoteCommandExecutor
-    mock_remote_executor = mocker.patch("marsh.core.executor.RemoteCommandExecutor", autospec=True)
-    remote_executor = mock_remote_executor.return_value
+def setup_connector(mocker):
+    mock_connector = mocker.patch("marsh.core.connector.Connector", autospec=True)
+    connector = mock_connector.return_value
+    connector.connect.return_value = MockExternalConnection()
 
-    remote_executor.establish_connection.return_value = MockExternalConnection()
+    def mock_disconnect(connection):
+        connection.close()
+    connector.disconnect.side_effect = mock_disconnect
 
-    # Use side_effect for close_connection to ensure proper behavior
-    def mock_close_connection(connection, *args, **kwargs):
-        connection.close(*args, **kwargs)
-
-    remote_executor.close_connection.side_effect = mock_close_connection
-    remote_executor.execute_command.return_value = (b"mock_stdout", b"mock_stderr")
-
-    # Remind: Make sure to pass the remote_executor instance for `self`
-    remote_executor.run.side_effect = RemoteCommandExecutor.run
-
-    return remote_executor
+    def mock_exec_cmd(command: list[str], connection):
+        return b"mock_stdout", b"mock_stderr"
+    connector.exec_cmd.side_effect = mock_exec_cmd
+    return connector
 
 
-def test_remote_command_executor_establish_connection(setup_remote_executor):
-    remote_executor = setup_remote_executor
-    connection = remote_executor.establish_connection()
-    assert isinstance(connection, MockExternalConnection)
-    assert connection.is_connected is True
+@pytest.fixture
+def setup_command_grammar(mocker):
+    mock_command_grammar = mocker.patch("marsh.core.command_grammar.CommandGrammar", autospec=True)
+    command_grammar = mock_command_grammar.return_value
+    command_grammar.build_cmd.return_value = ["/path/to/program", "--option=value", "arg"]
+    return command_grammar
 
 
-def test_remote_command_executor_close_connection(setup_remote_executor):
-    remote_executor = setup_remote_executor
-    connection = remote_executor.establish_connection()
-    remote_executor.close_connection(connection)
-    assert connection.is_connected is False
+def test_remote_command_executor_initialization(setup_connector, setup_command_grammar):
+    connector = setup_connector
+    command_grammar = setup_command_grammar
+    remote_command_executor = RemoteCommandExecutor(connector, command_grammar)
+
+    assert  remote_command_executor.connector == connector
+    assert  remote_command_executor.command_grammar == command_grammar
+    assert isinstance(remote_command_executor, RemoteCommandExecutor)
 
 
-def test_remote_command_executor_execute_command(setup_remote_executor):
-    remote_executor = setup_remote_executor
-    connection = remote_executor.establish_connection()
-    stdout, stderr = remote_executor.execute_command(connection, b"", b"")
+def test_remote_command_executor_run(setup_connector, setup_command_grammar):
+    connector = setup_connector
+    command_grammar = setup_command_grammar
+    remote_command_executor = RemoteCommandExecutor(connector, command_grammar)
+
+    stdout, stderr = remote_command_executor.run(b"", b"")
     assert stdout == b"mock_stdout"
     assert stderr == b"mock_stderr"
-
-
-def test_remote_command_executor_run(setup_remote_executor):
-    remote_executor = setup_remote_executor
-    connection = remote_executor.establish_connection()
-
-    assert connection.is_connected is True
-    stdout, stderr = remote_executor.run(remote_executor, b"", b"")
-    assert stdout == b"mock_stdout"
-    assert stderr == b"mock_stderr"
-    assert connection.is_connected is False
