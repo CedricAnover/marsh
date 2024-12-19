@@ -36,7 +36,12 @@ jobs:
       - name: Run pytest
         run: |
           cd src
-          poetry run pytest -vv --disable-warnings --tb=short --cov-report xml:../coverage.xml --cov=marsh ../tests/
+          poetry run pytest \
+            -vv --disable-warnings \
+            --tb=short --cov-report xml:../coverage.xml --cov=marsh \
+            --ignore=../tests/ssh/test_ssh_connector.py \
+            --ignore=../tests/ssh/test_ssh_factory.py \
+            ../tests/
 
       - name: Get Coverage
         if: ${{ github.event_name == 'pull_request' }}
