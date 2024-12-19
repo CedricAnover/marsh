@@ -9,9 +9,11 @@ if [ ! -d "$HOME/artifact-server-dir" ]; then
   mkdir -p "$HOME/artifact-server-dir/marsh"
 fi
 
+# Only run .github/workflows/test.yml
 act \
   --artifact-server-path="$HOME/artifact-server-dir" \
   --use-gitignore \
   --env-file=".env.act" \
   --secret-file=".secrets" \
-  --var-file=".vars"
+  --var-file=".vars" \
+  --workflows="./.github/workflows/test.yml"

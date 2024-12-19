@@ -23,10 +23,12 @@ fabric = "^3.2.2"
 pyproject-flake8 = "^7.0.0"  # Usage: `poetry run pflake8`
 isort = "^5.13.2"
 black = "^24.10.0"
+fabric = {extras = ["pytest"], version = "^3.2.2"}
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.3.2"
 pytest-mock = "^3.14.0"
+testcontainers = "^4.9.0"
 
 [tool.flake8]
 max-line-length = 120
