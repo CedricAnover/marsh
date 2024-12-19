@@ -10,8 +10,16 @@ class SshCommandGrammar(CommandGrammar):
     def build_cmd(self,
                   commands: list[str],
                   prev_stdout: Optional[bytes] = None,
-                  encoding="utf-8",
+                  *pipe_args,
+                  **pipe_kwargs,
                   ) -> list[str]:
         if prev_stdout:
-            return commands + [prev_stdout.decode(encoding).strip()]
+            return commands + [self._pipe_stdout(prev_stdout, *pipe_args, **pipe_kwargs)]
         return commands
+
+    @staticmethod
+    def _pipe_stdout(stdout: str | bytes, encoding: str = "utf-8") -> str:
+        return rf"""<<'EOF'
+{stdout if isinstance(stdout, str) else stdout.decode(encoding)}
+EOF
+"""

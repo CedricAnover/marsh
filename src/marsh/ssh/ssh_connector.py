@@ -12,12 +12,12 @@ class SshConnector(Connector):
     def __init__(self, config: Optional[Config] = None):
         self._config = config
 
-    def connect(self, host: str, *conn_args, **conn_kwargs) -> Connection:
+    def connect(self, *conn_args, **conn_kwargs) -> Connection:
         if self._config:
-            return Connection(host, config=self._config, *conn_args, **conn_kwargs)
-        return Connection(host, *conn_args, **conn_kwargs)
+            return Connection(*conn_args, config=self._config, **conn_kwargs)
+        return Connection(*conn_args, **conn_kwargs)
 
-    def disconnect(self, connection: Connection, *args, **kwargs) -> None:
+    def disconnect(self, connection: Connection) -> None:
         connection.close()
 
     def exec_cmd(self,
