@@ -19,14 +19,8 @@ def local_executor(mocker):
     # Mock CommandGrammar with mocker
     mock_command_grammar = mocker.patch("marsh.core.command_grammar.CommandGrammar", autospec=True)
     command_grammar = mock_command_grammar.return_value
-    command_grammar.program_path.return_value = "/path/to/program"
-    command_grammar.options.return_value = ["--option1", "value1", "--option2", "value2"]
-    command_grammar.program_args.return_value = ["arg1", "arg2"]
-    command_grammar.build_cmd.return_value = [
-        command_grammar.program_path.return_value,
-        *command_grammar.options.return_value,
-        *command_grammar.program_args.return_value
-    ]
+    command_grammar.build_cmd.side_effect = \
+        lambda *args, **kwargs: ['/path/to/program', '--option1', 'value1', '--option2', 'value2', 'arg1', 'arg2']
 
     # Create an instance of LocalCommandExecutor with the mocked command_grammar
     return LocalCommandExecutor(command_grammar=command_grammar)

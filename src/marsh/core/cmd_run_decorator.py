@@ -2,8 +2,6 @@ import functools
 import inspect
 from typing import Callable
 
-from marsh.utils import deprecated
-
 
 def _is_proc_or_mod_func_args_valid(func: Callable) -> bool:
     # Validate the signature of func
@@ -218,9 +216,6 @@ class CmdRunDecorator:
         for pre_modifier in reversed(self._pre_modifiers):  # Reverse order for before-modifiers
             cmd_runner = pre_modifier(cmd_runner)
 
-        # # Wrap the command runner
-        # cmd_runner = self._apply_cmd_runner(cmd_runner)
-
         # 3rd
         # Apply post-modifiers (after the command runner)
         for post_modifier in self._post_modifiers:
@@ -232,24 +227,6 @@ class CmdRunDecorator:
             cmd_runner = post_processor(cmd_runner)
 
         return cmd_runner
-
-    @deprecated
-    def _apply_cmd_runner(self, cmd_runner):
-        """
-        Wraps the command runner to execute it with pre- and post-modifiers.
-
-        Args:
-            cmd_runner (Callable): The command runner to wrap.
-
-        Returns:
-            Callable: The wrapped command runner function.
-        """
-        def wrapped(x_stdout, x_stderr, *args, **kwargs):
-            # Execute the command runner
-            stdout, stderr = cmd_runner(x_stdout, x_stderr, *args, **kwargs)
-            return stdout, stderr
-
-        return wrapped
 
 
 def add_processors_and_modifiers(*tup_list: list[tuple]) -> Callable[[bytes, bytes], tuple[bytes, bytes]]:
@@ -304,97 +281,9 @@ def add_processors_and_modifiers(*tup_list: list[tuple]) -> Callable[[bytes, byt
     return outer
 
 
-@deprecated(message="add_stdout_stderr_modifier() will be deprecated. Please use add_processors_and_modifiers() decorator instead.")
-def add_stdout_stderr_modifier(*mod_tuples: list[tuple]) -> Callable[[bytes, bytes], tuple[bytes, bytes]]:
-    """
-    A decorator that adds multiple stdout and stderr modifiers to a command runner.
-
-    This function allows applying multiple modifier functions to the command runner's output.
-
-    Args:
-        *mod_tuples (list[tuple]): A list of tuples specifying modifiers. Each tuple should contain:
-                                    (before, mod_func, mod_args, mod_kwargs) or variations.
-
-    Returns:
-        Callable[[bytes, bytes], tuple[bytes, bytes]]: A decorated command runner with the applied modifiers.
-    """
-    def outer(cmd_runner):
-        @functools.wraps(cmd_runner)
-        def wrapper(x_stdout, x_stderr, *args, **kwargs):
-            cmd_runner_decorator = CmdRunDecorator()
-            for tup in mod_tuples:
-                match tup:
-                    case (before, mod_func):
-                        cmd_runner_decorator.add_mod_processor(mod_func, before=before)
-                    case (before, mod_func, mod_args) if isinstance(mod_args, (tuple, list)):
-                        cmd_runner_decorator.add_mod_processor(mod_func, before=before, mod_args=mod_args)
-                    case (before, mod_func, mod_kwargs) if isinstance(mod_kwargs, dict):
-                        cmd_runner_decorator.add_mod_processor(mod_func, before=before, mod_kwargs=mod_kwargs)
-                    case (before, mod_func, mod_args, mod_kwargs) if isinstance(mod_args, (tuple, list)) and isinstance(mod_kwargs, dict):
-                        cmd_runner_decorator.add_mod_processor(mod_func, before=before, mod_args=mod_args, mod_kwargs=mod_kwargs)
-                    case _:
-                        error_message = f"{tup} is invalid."
-                        ValueError(error_message)
-            decorated_cmd_runner = cmd_runner_decorator.decorate(cmd_runner)
-            return decorated_cmd_runner(x_stdout, x_stderr, *args, **kwargs)
-        return wrapper
-    return outer
-
-
-@deprecated(message="add_pre_post_processors() will be deprecated. Please use add_processors_and_modifiers() decorator instead.")
-def add_pre_post_processors(*proc_tuples: list[tuple]) -> Callable[[bytes, bytes], tuple[bytes, bytes]]:
-    """
-    A decorator to add multiple pre- and post-processors to a command runner.
-
-    Args:
-        *proc_tuples (list[tuple]): A list of tuples specifying processors. Each tuple can contain:
-            - `(before, proc_func, proc_args, proc_kwargs)`
-            - `(bool, Callable)`
-            - `(bool, Callable, tuple|list)`
-            - `(bool, Callable, dict)`
-            - `(bool, Callable, tuple|list, dict)`
-
-    Returns:
-        Callable[[bytes, bytes], tuple[bytes, bytes]]: A decorated command runner.
-
-    Example:
-        ```python
-        @add_pre_post_processors(
-            (True, pre_proc),
-            (False, post_proc, (arg1,), {"key": "value"})
-        )
-        def my_cmd_runner(stdout, stderr):
-            return stdout, stderr
-        ```
-    """
-    def outer(cmd_runner):
-        @functools.wraps(cmd_runner)
-        def wrapper(x_stdout, x_stderr, *args, **kwargs):
-            cmd_runner_decorator = CmdRunDecorator()
-            for tup in proc_tuples:
-                match tup:
-                    case (before, proc_func):
-                        cmd_runner_decorator.add_processor(proc_func, before=before)
-                    case (before, proc_func, proc_args) if isinstance(proc_args, (tuple, list)):
-                        cmd_runner_decorator.add_processor(proc_func, before=before, proc_args=proc_args)
-                    case (before, proc_func, proc_kwargs) if isinstance(proc_kwargs, dict):
-                        cmd_runner_decorator.add_processor(proc_func, before=before, proc_kwargs=proc_kwargs)
-                    case (before, proc_func, proc_args, proc_kwargs) if isinstance(proc_args, (tuple, list)) and isinstance(proc_kwargs, dict):
-                        cmd_runner_decorator.add_processor(proc_func, before=before, proc_args=proc_args, proc_kwargs=proc_kwargs)
-                    case _:
-                        error_message = f"{tup} is invalid."
-                        ValueError(error_message)
-            decorated_cmd_runner = cmd_runner_decorator.decorate(cmd_runner)
-            return decorated_cmd_runner(x_stdout, x_stderr, *args, **kwargs)
-        return wrapper
-    return outer
-
-
 __all__ = (
     "processor_decorator",
     "stdout_stderr_modifier",
     "CmdRunDecorator",
-    "add_pre_post_processors",
-    "add_stdout_stderr_modifier",
     "add_processors_and_modifiers"
 )
