@@ -3,13 +3,32 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-name = "marsh"
+name = "marsh-lib"
 version = "0.1.0"
-package-mode = true
+#package-mode = true
 description = "Lightweight, extensible Python library for building, managing, and executing command workflows."
 authors = ["Cedric Anover <cedric.anover@hotmail.com>"]
+license = "MIT"
 readme = "README.md"
-# packages = [{include = "marsh", from = "src"}]
+repository = "https://github.com/CedricAnover/marsh"
+keywords = ["marsh", "marsh-lib"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Development Status :: 3 - Alpha",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Shells",
+    "Topic :: System :: System Shells",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux"
+]
+
+packages = [{include = "marsh", from = "src"}]
 exclude = [
     "tests/",
     "samples/"
