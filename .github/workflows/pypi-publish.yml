@@ -1,0 +1,23 @@
+name: PyPI Publish
+
+on:
+  push:
+    branches:
+      - "release-*"
+
+jobs:
+  pypi-publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and Publish to PyPI
+        uses: JRubics/poetry-publish@v2.0
+        with:
+          pypi_token: ${{ secrets.PYPI_TOKEN }}
+          python_version: "3.11"
+          build_format: "wheel"
+          poetry_install_options: "--without dev --without test"
+          poetry_publish_options: "--build --quiet --no-interaction --no-cache"
