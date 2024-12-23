@@ -13,11 +13,26 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: Build and Publish to PyPI
-        uses: JRubics/poetry-publish@v2.0
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
         with:
-          pypi_token: ${{ secrets.PYPI_TOKEN }}
-          python_version: "3.11"
-          build_format: "wheel"
-          poetry_install_options: "--without dev --without test"
-          poetry_publish_options: "--build --quiet --no-interaction --no-cache"
+          python-version: '3.11'
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies with Poetry
+        run: |
+          poetry lock
+          poetry install --without dev --without test
+
+      - name: Build the package
+        run: poetry build --format=wheel --quiet --no-ansi --no-interaction --no-cache -vv
+
+      - name: Publish to PyPI
+        env:
+          POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
+        run: poetry publish --no-interaction --quiet
