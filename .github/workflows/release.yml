@@ -4,10 +4,13 @@ on:
   push:
     tags:
       - "v*.*.*"
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    environment: pypi
     permissions:
       contents: write
     steps:
@@ -19,6 +22,7 @@ jobs:
 
   pypi-publish:
     runs-on: ubuntu-latest
+    environment: pypi
     permissions:
       contents: read
     steps:
@@ -30,3 +34,4 @@ jobs:
           python_version: "3.11"
           build_format: "wheel"
           poetry_install_options: "--without dev --without test"
+          poetry_publish_options: "--build"
