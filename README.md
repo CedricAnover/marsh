@@ -4,7 +4,16 @@
 
 ---
 
-### Key Features
+## Installation
+
+Install Marsh via pip:
+```text
+pip install marsh-lib
+```
+
+---
+
+## Key Features
 
 - **Command Chains:** Chain multiple commands into reusable workflows.
 - **Pre/Post Processors:** Add validation, logging, or error handling without modifying data.
