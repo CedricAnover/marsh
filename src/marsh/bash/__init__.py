@@ -6,6 +6,7 @@ from typing import Callable, Tuple
 from marsh.core import Conveyor, LocalCommandExecutor, CmdRunDecorator, EnvCwdRelayExecutor
 from marsh.bash.bash_grammar import BashGrammar
 from marsh.bash.bash_config import BashConfig
+from marsh.bash.bash_script import BashScript
 
 
 def generate_bash_script(*statements: list[str],
@@ -298,5 +299,6 @@ __all__ = (
     "create_bash_cmd_runner",
     "BashConveyorBelt",
     "BashUnixPipes",
-    "BashFactory"
+    "BashFactory",
+    "BashScript"
 )
