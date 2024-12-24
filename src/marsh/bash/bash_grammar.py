@@ -22,14 +22,6 @@ class BashGrammar(CommandGrammar):
         self._options = bash_options or []
         self._args = bash_args or []
 
-    @classmethod
-    def create_command(cls, command: str, *args, **kwargs) -> "BashGrammar":
-        return cls(*args, bash_path="bash", **kwargs).add_option("-c").add_arg(command)
-
-    @classmethod
-    def create_cmd_script(cls, script_path: str, *args, **kwargs) -> "BashGrammar":
-        return cls(*args, bash_path="bash", **kwargs).add_arg(script_path)
-
     @property
     def program_path(self) -> str:
         return self._bash_path
