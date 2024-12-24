@@ -14,7 +14,7 @@ class Script(ABC):
         Initializes a Script instance with a template to be rendered.
 
         Args:
-            script_template (Any): A template object (e.g., a `string.Template`, 
+            `script_template` (Any): A template object (e.g., a `string.Template`, 
                                    a Jinja2 template, or a plain string) 
                                    that serves as the base for script generation.
         """
