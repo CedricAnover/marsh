@@ -1,9 +1,11 @@
 name: PyPI Publish
 
 on:
-  push:
-    branches:
-      - "release-*"
+  workflow_run:
+    workflows:
+      - Release
+    types:
+      - completed
 
 jobs:
   pypi-publish:
@@ -30,7 +32,7 @@ jobs:
           poetry install --without dev --without test
 
       - name: Build the package
-        run: poetry build --format=wheel --quiet --no-ansi --no-interaction --no-cache -vv
+        run: poetry build --format=wheel --no-ansi --no-interaction --no-cache -vv
 
       - name: Publish to PyPI
         env:
