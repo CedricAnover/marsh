@@ -32,9 +32,18 @@ jobs:
           poetry install --without dev --without test
 
       - name: Build the package
-        run: poetry build --format=wheel --no-ansi --no-interaction --no-cache -vv
+        run: |
+          poetry build \
+            --format=wheel \
+            --no-interaction \
+            --no-cache \
+            -v
 
       - name: Publish to PyPI
         env:
           POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
-        run: poetry publish --no-interaction --quiet
+        run: |
+          poetry publish \
+            --no-interaction \
+            --no-cache \
+            --quiet
