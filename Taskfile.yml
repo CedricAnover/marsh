@@ -1,0 +1,132 @@
+version: '3'
+
+silent: true
+
+#####################################################################
+dotenv:
+  - .env
+
+# vars:
+#   VAR_NAME: value
+
+# env:
+#   GLOBAL_ENV_VAR: value
+
+#####################################################################
+tasks:
+  desc: Default Task
+  default:
+    cmds:
+      - echo "Running default task..."
+      - task: test-pytest
+#====================================================================
+  lint:
+    cmds:
+      - poetry run pflake8
+#====================================================================
+  test-all:
+    internal: true
+    deps: [test-act, test-pytest, test-sysbox]
+    cmd: echo "Tests Complete!!!"
+#====================================================================
+  test:
+    desc: Run all tests
+    prompt: This would run all the tests. Do you want to continue?
+    cmds:
+      - task: test-all
+#====================================================================
+  test-act:
+    desc: Run GitHub workflow tests with nektos/act and Docker.
+    dotenv:
+      - .env.act
+    vars:
+      ARTIFACT_DIR_NAME: artifact-server-dir
+    cmds:
+      - echo "Testing with nektos/act..."
+      - mkdir -p "$HOME/{{.ARTIFACT_DIR_NAME}}"
+      - |
+        act \
+          --artifact-server-path="$HOME/{{.ARTIFACT_DIR_NAME}}" \
+          --use-gitignore \
+          --env-file=".env.act" \
+          --secret-file=".secrets" \
+          --var-file=".vars" \
+          --workflows="./.github/workflows/test.yml"
+#====================================================================
+  test-pytest:
+    desc: Run unit and integration tests with pytest
+    vars:
+      IGNORE_FILES:
+        - --ignore=tests/ssh/test_ssh_connector.py
+        - --ignore=tests/ssh/test_ssh_factory.py
+    cmds:
+      - echo "Testing with pytest excluding ssh and remote features..."
+      - |
+        poetry run pytest \
+          -vv \
+          --disable-warnings \
+          --tb=short \
+          {{ .IGNORE_FILES | join " " }}
+#====================================================================
+  test-sysbox:
+    desc: Run tests with Sysbox for remote features
+    cmds:
+      - echo "Testing with Sysbox..."
+      - |
+        poetry run pytest \
+          -vv \
+          --disable-warnings \
+          --tb=short \
+          -s tests/ssh/
+#====================================================================
+  test-samples:
+    sources:
+      - samples/*.py
+    cmds:
+      - echo "Running the samples..."
+      - for: sources
+        cmd: python -B {{ .ITEM }}
+#====================================================================
+  clean:
+    desc: Clean all caches and artifacts
+    cmds:
+      - find . -type d -name "__pycache__" -exec rm -rf {} +
+      - find . -type d -name "*.pytest_cache" -exec rm -rf {} +
+      - find . -type f -name "*.pyc" -delete
+      - task: clean-artifacts
+#====================================================================
+  clean-artifacts:
+    desc: Clean all build artifacts
+    cmds:
+      - rm -rf build/ dist/
+#====================================================================
+  build:
+    desc: Build the package with poetry
+    vars:
+      FORMAT: wheel
+      PKG_OUTPUT: dist
+    deps: [clean]
+    cmd: |
+      echo "Building ..."
+
+      poetry build \
+        --format={{.FORMAT}} \
+        --output={{.PKG_OUTPUT}} \
+        --no-interaction \
+        --no-cache \
+        -vvv
+#====================================================================
+  publish:
+    desc: Publish to PyPI with poetry
+    prompt: Do you want to continue?
+    dotenv:
+      - .env.pypi
+    deps: [build]
+    cmds:
+      - echo "Publishing to PyPI..."
+      - |
+        poetry publish \
+          --no-cache \
+          --no-interaction \
+          -vvv
+#====================================================================

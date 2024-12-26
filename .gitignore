@@ -172,9 +172,13 @@ cython_debug/
 
 # VS Code
 .vscode
+.vs
 
 # Nektos Act
 .secrets
 *.secrets
 .vars
 *.vars
+
+# Task
+.task/
