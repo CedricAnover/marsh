@@ -226,16 +226,6 @@ class RemoteCommandExecutor(Executor):
             self.connector.disconnect(connection)
 
 
-class DockerCommandExecutor(Executor):
-    """Abstract class for executing commands in Docker containers."""
-
-    # TODO: Implement Abstract Class and Interface for DockerCommandExecutor
-    # This will use `docker` as the program of the CommandGrammar.
-    # We may build this on top of Python-on-Whales (CLI Wrapper) or Docker Python SDK (direct to unix socket).
-    def run(self, x_stdout, x_stderr, *args, **kwargs):
-        raise NotImplementedError
-
-
 class PythonExpressionExecutor(Executor):
     """Executes dynamic Python expressions using `eval`."""
 
@@ -271,5 +261,4 @@ __all__ = (
     "EnvCwdRelayExecutor",
     "RemoteCommandExecutor",
     "PythonExpressionExecutor",
-    "DockerCommandExecutor"
 )
