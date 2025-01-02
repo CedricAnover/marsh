@@ -1,4 +1,3 @@
-import logging
 from threading import Timer
 from typing import Optional
 
@@ -28,9 +27,6 @@ class DockerContainer:
         self._timeout_event = False  # Timeout Event Flag
         self._timer: Timer | None = None
 
-        logging.basicConfig(level=logging.INFO)
-        self.__logger = logging.getLogger(__name__)
-
         self._container: Optional[Container] = None
         self._client = docker.DockerClient(*client_args, **client_kwargs)
         self._create_args = create_args
@@ -58,7 +54,6 @@ class DockerContainer:
         # except (ImageNotFound, APIError) as e:
         except DockerException as e:
             self._clean()
-            self.__logger.error(f" Docker Error: {e}")
             raise
 
         return self._container
@@ -91,7 +86,7 @@ class DockerContainer:
             try:
                 self._container.remove(force=True)
             except DockerException as err:
-                self.__logger.warning(f" Failed to remove container '{self._name}': {err}")
+                pass
 
         all_containers: list[Container] = self._client.containers.list(all=True)
         for container in all_containers:
@@ -100,15 +95,15 @@ class DockerContainer:
                     container.stop(timeout=0)
                 except NotFound:
                     # This occurs when timeout event occurred.
-                    self.__logger.warning(" RuntimeError occurred.")
+                    pass
                 except DockerException as err:
-                    self.__logger.error(f" Docker Error occurred: {err}")
+                    raise
 
         # Close the docker client
         try:
             self._client.close()
         except DockerException as err:
-            self.__logger.error(f" Failed to close Docker client: {err}")
+            raise
 
 
 class DockerCommandExecutor(Executor):

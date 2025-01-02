@@ -1,1 +1,1 @@
-from marsh.docker.docker_executor import DockerCommandExecutor
+from marsh.docker.docker_executor import DockerContainer, DockerCommandExecutor
