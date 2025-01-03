@@ -6,47 +6,7 @@ import pytest
 
 from marsh.exceptions import DockerError, DockerClientError
 from marsh.docker import DockerContainer
-
-
-def _get_container_from_filter(container_name: str) -> tuple[str, str]:
-    # Get list of containers with the container name
-    result = \
-        subprocess.run(
-            [
-                "bash", "-c",
-                f'docker ps -a --filter "name={container_name}" --format "{{.Names}}"'
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-    return result.stdout.decode().strip(), result.stderr.decode().strip()
-
-
-@pytest.fixture(scope="function")
-def docker_container(request):
-    """
-    Fixture for creating named docker container.
-
-    Example:
-        ```python
-        @pytest.mark.parametrize('docker_container', ['test-container'], indirect=True)
-        def test_some_function(docker_container):
-            container = docker_container
-            container.name
-            ...
-        ```
-    """
-    container_name = request.param  # This allows you to pass a parameter
-    with DockerContainer("bash:latest", name=container_name) as container:
-        # Assert that the container is created successfully
-        assert container.status == "created"
-        yield container
-
-    # # Assert container resource is removed
-    stdout, stderr = _get_container_from_filter(container.name)
-    assert stdout == ""
-    assert stderr == ""
-    time.sleep(0.7)
+from .fixtures import _get_container_from_filter, docker_container
 
 
 def test_docker_container_instantiation():
@@ -103,7 +63,8 @@ def test_docker_container_timeout_handling():
     with DockerContainer("bash:latest", name=container_name, timeout=timeout) as container:
         with pytest.raises(TimeoutError, match=f"Timeout reached for container '{container_name}'."):
             # Sleep longer than the timeout to trigger the timeout handling
-            time.sleep(timeout + 1.5)
+            # time.sleep(timeout + 1.5)
+            container.exec_run(["bash", "-c", f"sleep {timeout + 1.5}"])
 
     stdout, stderr = _get_container_from_filter(container_name)
     assert stdout == ""
@@ -146,3 +107,11 @@ def test_docker_container_exec_run_with_invalid_command_in_container(docker_cont
     assert result.exit_code != 0
     assert result.output.decode().strip() == \
            f"bash: line 1: {command}: command not found"
+
+
+def test_docker_container_create_another_container_with_same_name():
+    container_name = "test_container_same_name"
+    with DockerContainer("bash:latest", name=container_name) as container:
+        with pytest.raises(DockerError):
+            with DockerContainer("bash:latest", name=container_name) as container_2:
+                pass

@@ -9,6 +9,7 @@ from docker.errors import DockerException, NotFound
 
 from marsh.exceptions import DockerError, DockerClientError
 from marsh import Executor
+from .docker_command_grammar import DockerCommandGrammar
 
 
 def generate_random_container_name(prefix="ephemeral-container"):
@@ -81,6 +82,7 @@ class DockerContainer:
         return True
 
     def _throw_timeout_error(self) -> None:
+        self._clean()
         raise TimeoutError(f"Timeout reached for container '{self._name}'.")
 
     def _clean(self) -> None:
@@ -97,11 +99,10 @@ class DockerContainer:
         for container in all_containers:
             if container.name == self._name:
                 try:
-                    # container.remove(force=True)
                     container.stop(timeout=0)
                 except NotFound as err:
                     # This occurs when timeout event occurred.
-                    print(f"[WARN] {err}")
+                    pass
 
         # Close the docker client
         try:
@@ -113,12 +114,13 @@ class DockerContainer:
 class DockerCommandExecutor(Executor):
     def __init__(self,
                  image: str,
-                 timeout: int = 600,
+                 *create_args,
                  container_name: str | None = None,
+                 pipe_prev_stdout: bool = False,
+                 timeout: int = 600,
+                 shell_command="/bin/sh -c",
                  client_args: tuple = (),
                  client_kwargs: dict | None = None,
-                 pipe_prev_stdout: bool = False,
-                 *create_args,
                  **create_kwargs,
                  ):
 
@@ -131,6 +133,9 @@ class DockerCommandExecutor(Executor):
         self._container_name = container_name
         self.timeout = timeout
         self.image = image  # Docker container image
+
+        # Create a DockerCommandGrammar and clean the given command
+        self._command_grammar = DockerCommandGrammar(shell_command=shell_command)
 
         self._pipe_prev_stdout = pipe_prev_stdout
 
@@ -155,13 +160,15 @@ class DockerCommandExecutor(Executor):
 
             # Unix Pipes, if specified
             if self._pipe_prev_stdout:
-                if isinstance(command, str):
-                    command += f" {x_stdout.decode().strip()}"
-                else:
-                    command = command + [x_stdout.decode().strip()]
+                full_command = self._command_grammar.build_cmd(command, x_stdout)
+            else:
+                full_command = self._command_grammar.build_cmd(command)
 
             # Run a command in the container
-            result = container.exec_run(command, **run_kwargs)
+            try:
+                result = container.exec_run(full_command, **run_kwargs)
+            except TimeoutError:
+                raise
 
             # Check exit code and update output streams
             if result.exit_code == 0:
