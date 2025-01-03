@@ -33,6 +33,7 @@ jobs:
           poetry install
           poetry add coverage pytest-cov
 
+      # TODO: Setup Docker for testing docker components (and possible ssh components).
       - name: Run pytest
         run: |
           cd src
@@ -41,6 +42,7 @@ jobs:
             --tb=short --cov-report xml:../coverage.xml --cov=marsh \
             --ignore=../tests/ssh/test_ssh_connector.py \
             --ignore=../tests/ssh/test_ssh_factory.py \
+            --ignore=../tests/docker/ \
             ../tests/
 
       - name: Get Coverage

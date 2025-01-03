@@ -37,6 +37,7 @@ exclude = [
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
 fabric = "^3.2.2"
+docker = "^7.1.0"
 
 [tool.poetry.group.dev.dependencies]
 pyproject-flake8 = "^7.0.0"  # Usage: `poetry run pflake8`
