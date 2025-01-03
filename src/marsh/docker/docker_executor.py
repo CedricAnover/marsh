@@ -1,3 +1,5 @@
+import uuid
+import time
 import threading
 from typing import Optional
 
@@ -9,21 +11,27 @@ from marsh.exceptions import DockerError, DockerClientError
 from marsh import Executor
 
 
+def generate_random_container_name(prefix="ephemeral-container"):
+    return prefix + "-" + str(uuid.uuid4()).replace('-', '')[:8]
+
+
 class DockerContainer:
     def __init__(self,
                  image: str,
                  *create_args,
                  client_args=(),
                  client_kwargs=None,
-                 name: str = "ephemeral-container",
+                 name: str | None = None,
                  timeout: int = 600,  # in seconds
+                 start_timeout: int = 1.5,  # Wait for few seconds after a container started
                  **create_kwargs
                  ):
         client_kwargs = client_kwargs or {}
 
         self._image = image
-        self._name = name
+        self._name = name or generate_random_container_name()
 
+        self._start_timeout = start_timeout
         self._timeout = timeout
         self._timer: threading.Timer | None = None
 
@@ -51,6 +59,7 @@ class DockerContainer:
 
             # Start the container
             self._container.start()
+            time.sleep(self._start_timeout)  # Wait for few seconds
 
             # Set the Timer to stop the container on timeout
             self._timer = threading.Timer(self._timeout, self._throw_timeout_error)
@@ -105,7 +114,7 @@ class DockerCommandExecutor(Executor):
     def __init__(self,
                  image: str,
                  timeout: int = 600,
-                 container_name: str = "ephemeral-container",
+                 container_name: str | None = None,
                  client_args: tuple = (),
                  client_kwargs: dict | None = None,
                  pipe_prev_stdout: bool = False,

@@ -52,10 +52,17 @@ def docker_container(request):
 def test_docker_container_instantiation():
     # Without using context manager
     container = DockerContainer("bash:latest", name="test-container")
+    container._clean()
     assert isinstance(container, DockerContainer)
     assert container._image == "bash:latest"
     assert container._name == "test-container"
     assert container._timeout == 600
+
+
+def test_docker_container_default_name():
+    container = DockerContainer("bash:latest")
+    container._clean()
+    assert container._name.startswith("ephemeral-container")
 
 
 def test_docker_container_resource_lifecycle():

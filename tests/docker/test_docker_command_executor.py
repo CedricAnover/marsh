@@ -15,7 +15,7 @@ def test_basic_command_with_piping():
     pass
 
 
-def test_chained_muliple_docker_executors():
+def test_chained_multiple_docker_executors():
     # Test how multiple command runners built from `DockerCommandExecutor`
     # would behave along with conveyor.
     pass
