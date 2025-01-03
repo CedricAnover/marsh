@@ -1,10 +1,11 @@
-from threading import Timer
+import threading
 from typing import Optional
 
 import docker
 from docker.models.containers import Container
 from docker.errors import DockerException, NotFound
 
+from marsh.exceptions import DockerError, DockerClientError
 from marsh import Executor
 
 
@@ -24,11 +25,15 @@ class DockerContainer:
         self._name = name
 
         self._timeout = timeout
-        self._timeout_event = False  # Timeout Event Flag
-        self._timer: Timer | None = None
+        self._timer: threading.Timer | None = None
 
         self._container: Optional[Container] = None
-        self._client = docker.DockerClient(*client_args, **client_kwargs)
+
+        try:
+            self._client = docker.DockerClient(*client_args, **client_kwargs)
+        except Exception as err:
+            raise DockerClientError(err)
+
         self._create_args = create_args
         self._create_kwargs = create_kwargs
 
@@ -48,13 +53,12 @@ class DockerContainer:
             self._container.start()
 
             # Set the Timer to stop the container on timeout
-            self._timer = Timer(self._timeout, self._stop_container)
+            self._timer = threading.Timer(self._timeout, self._throw_timeout_error)
             self._timer.start()
 
-        # except (ImageNotFound, APIError) as e:
-        except DockerException as e:
+        except Exception as err:
             self._clean()
-            raise
+            raise DockerError(err)
 
         return self._container
 
@@ -62,48 +66,39 @@ class DockerContainer:
         # Clean the resources
         self._clean()
 
-        if exc_type is not None:
+        if exc_type is TimeoutError:
             return False
 
         return True
 
-    def _stop_container(self) -> None:
-        self._timeout_event = True
-        try:
-            self._clean()
-            raise RuntimeError(f" Timeout reached for container '{self._name}'.")
-        except RuntimeError as err:
-            self.__logger.error(f"{err}")
-            raise
+    def _throw_timeout_error(self) -> None:
+        raise TimeoutError(f"Timeout reached for container '{self._name}'.")
 
     def _clean(self) -> None:
+        # 1. Cancel the Timer
+        # 2. Remove the Container
+        # 3. Close the Docker Client
+
         # Cancel the Timer
         if self._timer:
             self._timer.cancel()
 
         # Remove the Container
-        if self._container:
-            try:
-                self._container.remove(force=True)
-            except DockerException as err:
-                pass
-
         all_containers: list[Container] = self._client.containers.list(all=True)
         for container in all_containers:
             if container.name == self._name:
                 try:
+                    # container.remove(force=True)
                     container.stop(timeout=0)
-                except NotFound:
+                except NotFound as err:
                     # This occurs when timeout event occurred.
-                    pass
-                except DockerException as err:
-                    raise
+                    print(f"[WARN] {err}")
 
         # Close the docker client
         try:
             self._client.close()
         except DockerException as err:
-            raise
+            raise  DockerClientError(err)
 
 
 class DockerCommandExecutor(Executor):
