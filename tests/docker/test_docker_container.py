@@ -115,3 +115,29 @@ def test_docker_container_create_another_container_with_same_name():
         with pytest.raises(DockerError):
             with DockerContainer("bash:latest", name=container_name) as container_2:
                 pass
+
+
+@pytest.mark.parametrize('docker_container', ['test-container'], indirect=True)
+def test_docker_container_multiple_exec_run(docker_container):
+    results = []
+    container = docker_container
+
+    for i in range(1, 10 + 1):
+        results.append(container.exec_run(["bash", "-c", f'echo "Command {i}"']))
+
+    for i, result in enumerate(results):
+        assert result.exit_code == 0
+        assert result.output.decode().strip() == f"Command {i + 1}"  # Remind: Starts from index 0
+
+
+@pytest.mark.parametrize('docker_container', ['test-container'], indirect=True)
+def test_docker_container_multiple_exec_run_with_delay(docker_container):
+    results = []
+    container = docker_container
+    result_1 = container.exec_run(["bash", "-c", 'sleep 2 && echo "Command 1"'])
+    result_2 = container.exec_run(["bash", "-c", 'echo "Command 2"'])
+
+    assert result_1.exit_code == 0
+    assert result_1.output.decode().strip() == "Command 1"
+    assert result_2.exit_code == 0
+    assert result_2.output.decode().strip() == "Command 2"
