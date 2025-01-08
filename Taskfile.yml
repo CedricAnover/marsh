@@ -59,6 +59,7 @@ tasks:
       IGNORE_FILES:
         - --ignore=tests/ssh/test_ssh_connector.py
         - --ignore=tests/ssh/test_ssh_factory.py
+        - --ignore=tests/docker/
     cmds:
       - echo "Testing with pytest excluding ssh and remote features..."
       - |
@@ -69,7 +70,7 @@ tasks:
           {{ .IGNORE_FILES | join " " }}
 #====================================================================
   test-sysbox:
-    desc: Run tests with Sysbox for remote features
+    desc: Run tests with Sysbox for remote and docker features
     cmds:
       - echo "Testing with Sysbox..."
       - |
@@ -77,7 +78,7 @@ tasks:
           -vv \
           --disable-warnings \
           --tb=short \
-          -s tests/ssh/
+          -s tests/ssh/ tests/docker/
 #====================================================================
   test-samples:
     sources:
