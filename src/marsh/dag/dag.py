@@ -3,7 +3,7 @@ import threading
 import multiprocessing
 from concurrent.futures import as_completed, Future, ThreadPoolExecutor, ProcessPoolExecutor
 from graphlib import TopologicalSorter
-from typing import Dict, Optional, Set, List, Tuple, Self, Any
+from typing import Dict, Optional, Set, List, Tuple, Any
 
 from .startable import Startable
 
@@ -44,7 +44,7 @@ class Dag(Startable):
         self._graph.clear()
         self._last_startable = []
 
-    def add(self, dependent: Startable, *dependencies: Startable) -> Self:
+    def add(self, dependent: Startable, *dependencies: Startable) -> "Dag":
         """Adds a startable and its dependencies to the DAG."""
         # Update the Startable Dictionary
         self._startables[dependent.name] = dependent
@@ -80,14 +80,14 @@ class Dag(Startable):
             if startable.name in dependency_set:
                 self._graph[name].remove(startable.name)
 
-    def do(self, *startables: Startable) -> Self:
+    def do(self, *startables: Startable) -> "Dag":
         for startable in startables:
             self.add(startable)
 
         self._last_startable = startables
         return self
 
-    def then(self, *dependents: Startable) -> Self:
+    def then(self, *dependents: Startable) -> "Dag":
         assert dependents, "Dependents cannot be empty."
 
         for dependent in dependents:
@@ -96,7 +96,7 @@ class Dag(Startable):
         self._last_startable = dependents  # Updated to avoid side effects
         return self
 
-    def when(self, *dependencies: Startable) -> Self:
+    def when(self, *dependencies: Startable) -> "Dag":
         assert dependencies, "Dependencies cannot be empty."
 
         for dependent in self._last_startable:
