@@ -52,7 +52,11 @@ class Dag(Startable):
         for dependency in dependencies:
             self._startables[dependency.name] = dependency
 
-        # # Update the Graph Dictionary
+            # Make sure that if the dependency is not yet registered to the graph,
+            # then add them with with default empty set for their own dependencies.
+            self._graph[dependency.name] = self._graph.get(dependency.name, set())
+
+        # Update the Graph Dictionary
         # dependency_set: set[str] = self._graph.get(dependent.name, set())
         # self._graph[dependent.name] = dependency_set | set([dependency.name for dependency in dependencies])
         self._graph.setdefault(dependent.name, set()).update([d.name for d in dependencies])
