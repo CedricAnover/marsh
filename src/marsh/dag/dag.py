@@ -509,19 +509,20 @@ class ThreadDag(Dag):
 
         # Start the Loop
         while sorter.is_active():
-            ready_names = sorter.get_ready()
             with lock:
-                if ready_names:
-                    for name in ready_names:
-                        # Dispatch a worker only if there's room in the semaphore
-                        startable = self._startables[name]
-                        thread = threading.Thread(
-                            target=self._worker,
-                            args=(sorter, startable, results, lock, semaphore),
-                            daemon=True
-                        )
-                        thread.start()
-                        workers.append(thread)
+                ready_names = sorter.get_ready()
+
+            if ready_names:
+                for name in ready_names:
+                    # Dispatch a worker only if there's room in the semaphore
+                    startable = self._startables[name]
+                    thread = threading.Thread(
+                        target=self._worker,
+                        args=(sorter, startable, results, lock, semaphore),
+                        daemon=True
+                    )
+                    thread.start()
+                    workers.append(thread)
 
         # Wait for all threads to finish
         for thread in workers:
