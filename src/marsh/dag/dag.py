@@ -658,10 +658,11 @@ class MultiprocessDag(Dag):
             while sorter.is_active():
                 with lock:
                     ready_names = sorter.get_ready()
-                    if ready_names:
-                        for name in ready_names:
-                            startable = self._startables[name]
-                            startable_queue.put(startable)
+
+                if ready_names:
+                    for name in ready_names:
+                        startable = self._startables[name]
+                        startable_queue.put(startable)
 
             # Wait until all startables are processed
             startable_queue.join()
