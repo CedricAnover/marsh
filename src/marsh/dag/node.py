@@ -1,5 +1,6 @@
 from typing import Tuple
 
+from ..logger import result_logging_decorator
 from ..core import Conveyor
 from .startable import Startable
 
@@ -37,6 +38,7 @@ class Node(Startable):
         # Conveyor keyword arguments for __call__
         self._kwargs = kwargs
 
+    @result_logging_decorator(__name__)
     def start(self) -> Tuple[bytes, bytes]:
         """
         Starts the operation associated with the Node by invoking the Conveyor.
