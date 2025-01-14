@@ -1,4 +1,7 @@
-def print_output_stream(inp_stdout: bytes, 
+import logging
+
+
+def print_output_stream(inp_stdout: bytes,
                         inp_stderr: bytes,
                         *args,
                         output_stream="stdout",
@@ -29,9 +32,32 @@ def print_all_output_streams(inp_stdout: bytes, inp_stderr: bytes, *args, encodi
     print_stderr(inp_stdout, inp_stderr, *args, encoding=encoding, **kwargs)
 
 
+def log_output_streams(inp_stdout: bytes,
+                       inp_stderr: bytes,
+                       name="ConsoleLogger",
+                       log_level=logging.DEBUG,
+                       format_="[%(levelname)s] %(asctime)s | %(message)s",
+                       encoding='utf-8'
+                       ) -> None:
+    logger = logging.getLogger(name)
+    logger.setLevel(log_level)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(format_)
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
+
+    if inp_stderr.strip():
+        logger.error(inp_stderr.decode(encoding).strip())
+
+    if inp_stdout.strip():
+        logger.info(inp_stdout.decode(encoding).strip())
+
+
 __all__ = (
     "print_output_stream",
     "print_stdout",
     "print_stderr",
-    "print_all_output_streams"
+    "print_all_output_streams",
+    "log_output_streams"
 )
