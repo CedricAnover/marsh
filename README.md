@@ -59,7 +59,9 @@ from marsh import CmdRunDecorator
 def validate(stdout, stderr): assert not stderr.strip()      # Validate no errors
 def log(stdout, stderr): print(f"LOG: {stdout.decode()}")    # Log output
 
-decorator = CmdRunDecorator().add_processor(validate, before=True).add_processor(log, before=False)
+decorator = CmdRunDecorator()\
+  .add_processor(validate, before=True)\
+  .add_processor(log, before=False)
 
 def cmd_runner(stdout, stderr): return stdout, stderr
 decorated_runner = decorator.decorate(cmd_runner)
@@ -81,7 +83,9 @@ LOG: Hello
 def to_upper(stdout, stderr): return stdout.upper(), stderr
 def add_prefix(stdout, stderr): return b"Prefix: " + stdout, stderr
 
-decorator = CmdRunDecorator().add_mod_processor(to_upper, before=True).add_mod_processor(add_prefix, before=False)
+decorator = CmdRunDecorator()\
+  .add_mod_processor(to_upper, before=True)\
+  .add_mod_processor(add_prefix, before=False)
 
 def cmd_runner(stdout, stderr): return stdout, stderr
 decorated_runner = decorator.decorate(cmd_runner)
@@ -106,6 +110,18 @@ Prefix: HELLO
 > 3. **Command Runner**  
 > 4. **Post-Modifiers**  
 > 5. **Post-Processors**  
+
+---
+
+### Passing `CmdRunDecorator` instance as parameter for reusabiliity
+
+```python
+from marsh import Conveyor, CmdRunDecorator
+
+decorator = CmdRunDecorator().add_processor(...).add_mod_processor(...)
+conveyor = Conveyor().add_cmd_runner(cmd_runner, cmd_runner_decorator=decorator)
+stdout, stderr = conveyor()
+```
 
 ---
 
@@ -276,7 +292,7 @@ _task_ in the workflow, while the `Dag` represents the whole workflow and task d
 Note that the `Dag` manages `Startable` objects, which is the abstract base class for both `Node` and `Dag`. This means
 that a `Dag` can contain both `Node` objects and other `Dag` objects.
 
-**Different kinds of `Dag`'s:**
+**Different kinds of `Dag`:**
 
 - `SyncDag`
 - `AsyncDag`
@@ -316,16 +332,16 @@ result = result_dict["node_or_dag_name"]  # Get result from individual startable
 ⚠️ **IMPORTANT:**
 
 - `MultiprocessDag` and `ProcessPoolDag` requires the `start()` method to run in scope of `if __name__ == "__main__"`.
-    ```python
-    from marsh.dag import MultiprocessDag, ProcessPoolDag
-    
-    ...
-    
-    if __name__ == "__main__":
-        ...
-        dag.start()
-        ...
-    ```
+  ```python
+  from marsh.dag import MultiprocessDag, ProcessPoolDag
+  
+  ...
+  
+  if __name__ == "__main__":
+      ...
+      dag.start()
+      ...
+  ```
 - As of the latest version, marsh DAG does not support **_result passing_** between task dependencies.
 
 ---
