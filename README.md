@@ -1,6 +1,9 @@
 # Marsh
 
-**Marsh** is a lightweight Python library for building, managing, and executing command workflows. It allows chaining commands, defining custom pre/post processing logic, and structuring flexible CLI workflows. With support for local, remote, Docker-based, and Python expression execution, Marsh simplifies automating pipelines and integrating external processes.
+**Marsh** is a lightweight Python library for building, managing, and executing command workflows. It allows chaining
+commands, defining custom pre/post processing logic, creating DAG workflows, and structuring flexible CLI workflows.
+With support for local, remote, Docker-based, and Python execution, Marsh simplifies automating pipelines and
+integrating external processes.
 
 ---
 
@@ -18,7 +21,8 @@ pip install marsh-lib
 - **Command Chains:** Chain multiple commands into reusable workflows.
 - **Pre/Post Processors:** Add validation, logging, or error handling without modifying data.
 - **Pre/Post Modifiers:** Transform input/output data during command execution.
-- **Execution Options:** Local, remote (via SSH), Docker, and custom runners.
+- **Execution Options:** Local, Remote, Docker, Python, and custom runners.
+- **DAG Workflows:** Support for DAG to define and run task dependencies.
 
 ---
 
@@ -52,8 +56,8 @@ INPUT error
 ```python
 from marsh import CmdRunDecorator
 
-def validate(stdout, stderr): assert not stderr.strip()  # Validate no errors
-def log(stdout, stderr): print(f"LOG: {stdout.decode()}")  # Log output
+def validate(stdout, stderr): assert not stderr.strip()      # Validate no errors
+def log(stdout, stderr): print(f"LOG: {stdout.decode()}")    # Log output
 
 decorator = CmdRunDecorator().add_processor(validate, before=True).add_processor(log, before=False)
 
@@ -105,6 +109,25 @@ Prefix: HELLO
 
 ---
 
+### Using `@add_processors_and_modifiers` for decorating command runners
+
+```python
+from marsh import add_processors_and_modifiers
+
+
+@add_processors_and_modifiers(
+    ("mod", True, pre_mod_func, arg_tuple, kwg_dict),      # Pre-Modifier
+    ("proc", True, pre_proc_func, arg_tuple, kwg_dict),    # Pre-Processor
+    ("mod", False, post_mod_func, arg_tuple, kwg_dict),    # Post-Modifier
+    ("proc", False, post_proc_func, arg_tuple, kwg_dict),  # Post-Processor
+)
+def cmd_runner(x_stdout: bytes, x_stderr: bytes):
+    ...
+    return b"stdout", b"stderr"
+```
+
+---
+
 ### Running Local Commands with `BashFactory`
 
 #### Simple Local Command
@@ -124,7 +147,13 @@ from marsh.bash import BashFactory
 bash = BashFactory()
 
 # Inject Environment Variables
-cmd1 = bash.create_cmd_runner(r'echo "($ENV_VAR_1, $ENV_VAR_2)"', env={"ENV_VAR_1": "value1", "ENV_VAR_2": "value2"})
+cmd1 = bash.create_cmd_runner(
+    r'echo "($ENV_VAR_1, $ENV_VAR_2)"',
+    env={
+        "ENV_VAR_1": "value1",
+        "ENV_VAR_2": "value2"
+    }
+)
 
 # Change Working Directory
 cmd2 = bash.create_cmd_runner(r'echo "CWD: $PWD"', cwd=str(Path.cwd().parent))
@@ -169,3 +198,138 @@ cmd2 = ssh.create_chained_cmd_runner(["echo Hi", "echo there"])
 conveyor = Conveyor().add_cmd_runner(cmd1).add_cmd_runner(cmd2)
 stdout, stderr = conveyor()
 ```
+
+---
+
+### Running Commands with `DockerCommandExecutor`
+
+```python
+from marsh.docker.docker_executor import DockerCommandExecutor
+
+docker_executor = DockerCommandExecutor("bash:latest", ...)
+
+stdout, stderr = docker_executor.run(
+    b"x_stdout", b"x_stderr",
+    environment=dict(ENV_VAR_1="value1", ENV_VAR_2="value2"),
+    workdir="/app"
+)
+```
+
+---
+
+### Running Commands with `PythonExecutor`
+
+#### `eval` mode for evaluating python expressions
+
+```python
+from marsh import PythonExecutor
+
+py_code = """x + y"""     # Python Evaluatable Expression
+
+python_executor = PythonExecutor(
+    py_code,
+    mode="eval",
+    namespace=dict(x=1, y=2),
+    use_pickle=False,
+)
+
+stdout, stderr = python_executor.run(b"x_stdout", b"x_stderr", ...)
+
+```
+
+#### `exec` mode for executing python statements
+
+```python
+from marsh import PythonExecutor
+
+py_code = """
+import os
+import sys
+
+prev_stdout = x_stdout    #<-- Use `x_stdout` to get the previous STDOUT
+prev_stderr = x_stderr    #<-- Use `x_stderr` to get the previous STDERR
+exec_result = x + y       #<-- Use `exec_result` for storing results and passing to STDOUT
+"""
+
+python_executor = PythonExecutor(
+    py_code,
+    mode="exec",
+    namespace=dict(x=1, y=2),
+    use_pickle=False,
+)
+
+stdout, stderr = python_executor.run(b"x_stdout", b"x_stderr", ...)
+
+```
+
+**Note:** `eval` mode also have access to `x_stdout` and `x_stderr` but not `exec_result`.
+
+---
+
+### DAG Workflow
+
+The DAG extends the capabilities of the core components by allowing non-linear dependencies between tasks.
+
+The DAG subpackage has two main components: `Node` and `Dag`. The `Node` encapsulates a `Conveyor` that represents a
+_task_ in the workflow, while the `Dag` represents the whole workflow and task dependencies.
+
+Note that the `Dag` manages `Startable` objects, which is the abstract base class for both `Node` and `Dag`. This means
+that a `Dag` can contain both `Node` objects and other `Dag` objects.
+
+**Different kinds of `Dag`'s:**
+
+- `SyncDag`
+- `AsyncDag`
+- `ThreadDag`
+- `ThreadPoolDag`
+- `MultiprocessDag`
+- `ProcessPoolDag`
+
+#### Defining Nodes
+
+```python
+from marsh import Conveyor
+from marsh.dag import Node
+
+conveyor = Conveyor().add_cmd_runner(cmd_runner, ...)
+node = Node("node_name", conveyor, **run_kwargs)
+```
+
+#### Defining and Running a Dag
+
+```python
+from marsh.dag import SyncDag
+
+dag = SyncDag("dag_name")
+
+# Register Nodes
+dag.do(node_a)
+dag.do(node_a).then(node_b, node_c)       # A --> {B, C}
+dag.do(node_a).when(node_b, node_c)       # {B, C} --> A
+dag.do(other_dag).then(node_a)            # Register other Dag
+...
+
+result_dict = dag.start()                 # Run the Dag
+result = result_dict["node_or_dag_name"]  # Get result from individual startables
+```
+
+⚠️ **IMPORTANT:**
+
+- `MultiprocessDag` and `ProcessPoolDag` requires the `start()` method to run in scope of `if __name__ == "__main__"`.
+    ```python
+    from marsh.dag import MultiprocessDag, ProcessPoolDag
+    
+    ...
+    
+    if __name__ == "__main__":
+        ...
+        dag.start()
+        ...
+    ```
+- As of the latest version, marsh DAG does not support **_result passing_** between task dependencies.
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
