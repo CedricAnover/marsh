@@ -37,18 +37,17 @@ class CustomRotatingFileHandler(RotatingFileHandler):
 def create_rotating_file_logger(logger_name: str,
                                 log_file_path: str,
                                 size_mb: int = 1,
-                                bak_count: int = 2
+                                bak_count: int = 0,
+                                format_: str = "[%(levelname)s] %(message)s",
                                 ) -> logging.Logger:
     # Define the log format
     log_formatter = logging.Formatter(
-        "[%(levelname)s] %(asctime)s | %(name)s | Line %(lineno)d | %(message)s"
+        format_
     )
-
-    file_path = str(LOG_DIR_PATH / log_file_path)
 
     # Set up the rotating file handler
     rotating_handler = CustomRotatingFileHandler(
-        file_path,
+        log_file_path,
         maxBytes=size_mb * 1024 * 1024,
         backupCount=bak_count
     )
@@ -57,17 +56,20 @@ def create_rotating_file_logger(logger_name: str,
     logger_template = LoggerTemplate(
         logger_name=logger_name,
         log_level=logging.DEBUG,
-        log_handler=rotating_handler,
+        log_handlers=[rotating_handler],
         log_formatter=log_formatter
     )
 
     return logger_template.create_logger()
 
 
-def create_console_logger(logger_name: str) -> logging.Logger:
+def create_console_logger(logger_name: str,
+                          log_level=logging.DEBUG,
+                          format_: str = "[%(levelname)s] %(message)s"
+                          ) -> logging.Logger:
     # Define the log format
     log_formatter = logging.Formatter(
-        "[%(levelname)s] %(asctime)s | %(name)s | Line %(lineno)d | %(message)s"
+        format_
     )
 
     console_handler = logging.StreamHandler()
@@ -75,7 +77,7 @@ def create_console_logger(logger_name: str) -> logging.Logger:
     # Create a logger using the template
     logger_template = LoggerTemplate(
         logger_name=logger_name,
-        log_level=logging.DEBUG,
+        log_level=log_level,
         log_handlers=[console_handler],
         log_formatter=log_formatter
     )

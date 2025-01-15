@@ -1,6 +1,8 @@
-import re
 import pprint
 import logging
+
+from ..utils.output_streams import mask_sensitive_data
+from ..logger import create_console_logger
 
 
 def print_output_stream(inp_stdout: bytes,
@@ -52,40 +54,30 @@ def pprint_output_stream(inp_stdout: bytes,
             pprinter.pprint(inp_stderr.decode(encoding).strip())
 
 
-def _mask_sensitive_data(text: str, patterns: list[str], placeholder="***") -> str:
-    """Masks sensitive data in the given text based on provided regex patterns."""
-    for pattern in patterns:
-        text = re.sub(pattern, placeholder, text)
-    return text
-
-
 def log_output_streams(inp_stdout: bytes,
                        inp_stderr: bytes,
                        name="ConsoleLogger",
                        log_level=logging.DEBUG,
-                       format_="[%(levelname)s] %(asctime)s | %(message)s",
+                       format_="[%(levelname)s] %(message)s",
                        encoding='utf-8',
                        sensitive_patterns: list[str] | None = None
                        ) -> None:
-    if sensitive_patterns is None:  # `sensitive_patterns` is a list of regex patterns
-        sensitive_patterns = []
+    logger = create_console_logger(
+        logger_name=name,
+        format_=format_
+    )
 
-    logger = logging.getLogger(name)
-    logger.setLevel(log_level)
-    stream_handler = logging.StreamHandler()
-    stream_handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter(format_)
-    stream_handler.setFormatter(formatter)
-    logger.addHandler(stream_handler)
+    if sensitive_patterns is None:
+        sensitive_patterns = []
 
     if inp_stderr.strip():
         stderr_message = inp_stderr.decode(encoding).strip()
-        stderr_message = _mask_sensitive_data(stderr_message, sensitive_patterns)
+        stderr_message = mask_sensitive_data(stderr_message, sensitive_patterns)
         logger.error(stderr_message)
 
     if inp_stdout.strip():
         stdout_message = inp_stdout.decode(encoding).strip()
-        stdout_message = _mask_sensitive_data(stdout_message, sensitive_patterns)
+        stdout_message = mask_sensitive_data(stdout_message, sensitive_patterns)
         logger.info(stdout_message)
 
 
