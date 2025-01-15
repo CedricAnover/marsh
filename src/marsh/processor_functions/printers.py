@@ -1,4 +1,8 @@
+import pprint
 import logging
+
+from ..utils.output_streams import mask_sensitive_data
+from ..logger import create_console_logger
 
 
 def print_output_stream(inp_stdout: bytes,
@@ -32,26 +36,49 @@ def print_all_output_streams(inp_stdout: bytes, inp_stderr: bytes, *args, encodi
     print_stderr(inp_stdout, inp_stderr, *args, encoding=encoding, **kwargs)
 
 
+def pprint_output_stream(inp_stdout: bytes,
+                         inp_stderr: bytes,
+                         output_stream="stdout",
+                         encoding='utf-8',
+                         **pprinter_kwargs
+                         ) -> None:
+    if output_stream not in ["stdout", "stderr"]:
+        raise ValueError("Output stream must be 'stdout' or 'stderr'.")
+
+    pprinter = pprint.PrettyPrinter(**pprinter_kwargs)
+    if output_stream == "stdout":
+        if inp_stdout.strip():
+            pprinter.pprint(inp_stdout.decode(encoding).strip())
+    else:
+        if inp_stderr.strip():
+            pprinter.pprint(inp_stderr.decode(encoding).strip())
+
+
 def log_output_streams(inp_stdout: bytes,
                        inp_stderr: bytes,
                        name="ConsoleLogger",
                        log_level=logging.DEBUG,
-                       format_="[%(levelname)s] %(asctime)s | %(message)s",
-                       encoding='utf-8'
+                       format_="[%(levelname)s] %(message)s",
+                       encoding='utf-8',
+                       sensitive_patterns: list[str] | None = None
                        ) -> None:
-    logger = logging.getLogger(name)
-    logger.setLevel(log_level)
-    stream_handler = logging.StreamHandler()
-    stream_handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter(format_)
-    stream_handler.setFormatter(formatter)
-    logger.addHandler(stream_handler)
+    logger = create_console_logger(
+        logger_name=name,
+        format_=format_
+    )
+
+    if sensitive_patterns is None:
+        sensitive_patterns = []
 
     if inp_stderr.strip():
-        logger.error(inp_stderr.decode(encoding).strip())
+        stderr_message = inp_stderr.decode(encoding).strip()
+        stderr_message = mask_sensitive_data(stderr_message, sensitive_patterns)
+        logger.error(stderr_message)
 
     if inp_stdout.strip():
-        logger.info(inp_stdout.decode(encoding).strip())
+        stdout_message = inp_stdout.decode(encoding).strip()
+        stdout_message = mask_sensitive_data(stdout_message, sensitive_patterns)
+        logger.info(stdout_message)
 
 
 __all__ = (
@@ -59,5 +86,6 @@ __all__ = (
     "print_stdout",
     "print_stderr",
     "print_all_output_streams",
+    "pprint_output_stream",
     "log_output_streams"
 )
