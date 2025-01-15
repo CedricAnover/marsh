@@ -1,3 +1,4 @@
+import pprint
 import logging
 
 
@@ -30,6 +31,24 @@ def print_stderr(inp_stdout: bytes, inp_stderr: bytes, *args, encoding='utf-8', 
 def print_all_output_streams(inp_stdout: bytes, inp_stderr: bytes, *args, encoding='utf-8', **kwargs) -> None:
     print_stdout(inp_stdout, inp_stderr, *args, encoding=encoding, **kwargs)
     print_stderr(inp_stdout, inp_stderr, *args, encoding=encoding, **kwargs)
+
+
+def pprint_output_stream(inp_stdout: bytes,
+                         inp_stderr: bytes,
+                         output_stream="stdout",
+                         encoding='utf-8',
+                         **pprinter_kwargs
+                         ) -> None:
+    if output_stream not in ["stdout", "stderr"]:
+        raise ValueError("Output stream must be 'stdout' or 'stderr'.")
+
+    pprinter = pprint.PrettyPrinter(**pprinter_kwargs)
+    if output_stream == "stdout":
+        if inp_stdout.strip():
+            pprinter.pprint(inp_stdout.decode(encoding).strip())
+    else:
+        if inp_stderr.strip():
+            pprinter.pprint(inp_stderr.decode(encoding).strip())
 
 
 def log_output_streams(inp_stdout: bytes,
