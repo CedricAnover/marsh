@@ -1,3 +1,4 @@
+import re
 import pprint
 import logging
 
@@ -51,13 +52,24 @@ def pprint_output_stream(inp_stdout: bytes,
             pprinter.pprint(inp_stderr.decode(encoding).strip())
 
 
+def _mask_sensitive_data(text: str, patterns: list[str], placeholder="***") -> str:
+    """Masks sensitive data in the given text based on provided regex patterns."""
+    for pattern in patterns:
+        text = re.sub(pattern, placeholder, text)
+    return text
+
+
 def log_output_streams(inp_stdout: bytes,
                        inp_stderr: bytes,
                        name="ConsoleLogger",
                        log_level=logging.DEBUG,
                        format_="[%(levelname)s] %(asctime)s | %(message)s",
-                       encoding='utf-8'
+                       encoding='utf-8',
+                       sensitive_patterns: list[str] | None = None
                        ) -> None:
+    if sensitive_patterns is None:  # `sensitive_patterns` is a list of regex patterns
+        sensitive_patterns = []
+
     logger = logging.getLogger(name)
     logger.setLevel(log_level)
     stream_handler = logging.StreamHandler()
@@ -67,10 +79,14 @@ def log_output_streams(inp_stdout: bytes,
     logger.addHandler(stream_handler)
 
     if inp_stderr.strip():
-        logger.error(inp_stderr.decode(encoding).strip())
+        stderr_message = inp_stderr.decode(encoding).strip()
+        stderr_message = _mask_sensitive_data(stderr_message, sensitive_patterns)
+        logger.error(stderr_message)
 
     if inp_stdout.strip():
-        logger.info(inp_stdout.decode(encoding).strip())
+        stdout_message = inp_stdout.decode(encoding).strip()
+        stdout_message = _mask_sensitive_data(stdout_message, sensitive_patterns)
+        logger.info(stdout_message)
 
 
 __all__ = (
@@ -78,5 +94,6 @@ __all__ = (
     "print_stdout",
     "print_stderr",
     "print_all_output_streams",
+    "pprint_output_stream",
     "log_output_streams"
 )
