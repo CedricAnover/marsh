@@ -19,3 +19,9 @@ def mask_sensitive_data(text: str, patterns: list[str], placeholder="***") -> st
     for pattern in patterns:
         text = re.sub(pattern, placeholder, text)
     return text
+
+
+__all__ = (
+    "suppress_output",
+    "mask_sensitive_data",
+)

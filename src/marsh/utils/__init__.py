@@ -1,6 +1,8 @@
 import warnings
 from functools import wraps
 
+from .output_streams import *
+
 
 def deprecated(message: str = ""):
     def outer(func):
@@ -12,5 +14,7 @@ def deprecated(message: str = ""):
                 stacklevel=2
             )
             return func(*args, **kwargs)
+
         return wrapper
+
     return outer
