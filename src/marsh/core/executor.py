@@ -1,11 +1,15 @@
 import textwrap
 import pickle
 import subprocess
+import shlex
+import os
+from copy import deepcopy
+from string import Template
 from abc import abstractmethod, ABC
 from typing import Callable, Tuple, Any
 
 from ..utils.output_streams import suppress_output
-from .command_grammar import CommandGrammar
+from .command_grammar import CommandGrammar, PyCommandGrammar
 from .connector import Connector
 
 
@@ -288,9 +292,103 @@ class PythonExecutor(Executor):
                 return b"", str(err).encode(encoding)
 
 
+class PyInterpreterExecutor(Executor):
+    """
+    Executes Python code in a shell environment using a specified shell and Python command.
+
+    This class allows for the execution of Python code within a shell environment (default is Bash) by invoking
+    a specified Python command (default is `python -c`). The Python code can reference the previous command's
+    standard output and standard error using placeholders.
+    """
+
+    def __init__(self,
+                 shell_cmd: str = "bash -c",
+                 py_cmd: str = "python -c",
+                 posix: bool = True,
+                 comments: bool = False,
+                 use_shlex_quote: bool = False,
+                 ):
+        """
+       Initializes the PyInterpreterExecutor with the specified shell and Python command.
+
+       Args:
+           shell_cmd (str, optional): The shell command to use (default is "bash -c").
+           py_cmd (str, optional): The Python command to invoke (default is "python -c").
+           encoding (str, optional): The encoding for the input and output. Defaults to "utf-8".
+           posix (bool, optional): Whether to follow POSIX parsing rules for shell execution. Defaults to `True`.
+           comments (bool, optional): If `True`, lines starting with `#` will be ignored in parsing. Defaults to `False`.
+           use_shlex_quote (bool, optional): Apply shlex quoting to shell and python commands. Defaults to `False`.
+       """
+        self._cmd_grammar = PyCommandGrammar(shell_cmd, py_cmd)
+
+        self._posix = posix
+        self._comments = comments
+        self._use_shlex_quote = use_shlex_quote
+
+    def run(self,
+            x_stdout: bytes,
+            x_stderr: bytes,
+            py_code: str,
+            timeout: float = 600,
+            env: dict | None = None,
+            cwd: str | None = None,
+            encoding: str = "utf-8",
+            **popen_kwargs
+            ) -> Tuple[bytes, bytes]:
+        """
+        Executes Python code within the shell environment.
+
+        The provided Python code can reference previous command results using `$x_stdout` and `$x_stderr`. The code
+        will be executed in the specified shell with the given environment and working directory.
+
+        Args:
+            x_stdout (bytes): Standard output from a previous command, passed to the Python code.
+            x_stderr (bytes): Standard error from a previous command, passed to the Python code.
+            py_code (str): The Python code to execute, with placeholders (template variables) for previous stdout and stderr.
+            timeout (float, optional): The timeout for the execution, in seconds. Defaults to 600.
+            env (dict, optional): The environment variables to pass to the process. Defaults to None.
+            cwd (str, optional): The working directory for the process. Defaults to None.
+            encoding (str, optional): The encoding for the input and output. Defaults to "utf-8".
+            **popen_kwargs: Additional keyword arguments for `subprocess.Popen`.
+
+        Returns:
+            Tuple[bytes, bytes]: A tuple containing the standard output and error of the executed Python code.
+        """
+
+        # Users need to use `$x_stdin` and `$x_stdout` for referencing previous stdout and stderr
+        python_template = Template(textwrap.dedent(py_code))
+        python_code = python_template.safe_substitute(
+            x_stdout=x_stdout,
+            x_stderr=x_stderr,
+        )
+
+        # Build the full command
+        full_command = self._cmd_grammar.build_cmd(
+            comments=self._comments,
+            posix=self._posix,
+            use_shlex_quote=self._use_shlex_quote
+        )
+
+        env_ = deepcopy(os.environ)
+        if env:
+            env_.update(env)
+
+        process = subprocess.Popen(
+            full_command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=cwd,
+            env=env_,
+            **popen_kwargs
+        )
+        return process.communicate(input=python_code.encode(encoding), timeout=timeout)
+
+
 __all__ = (
     "Executor",
     "LocalCommandExecutor",
     "RemoteCommandExecutor",
     "PythonExecutor",
+    "PyInterpreterExecutor",
 )
