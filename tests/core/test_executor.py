@@ -8,7 +8,8 @@ from marsh import (
     Executor,
     LocalCommandExecutor,
     RemoteCommandExecutor,
-    PythonExecutor
+    PythonExecutor,
+    PyInterpreterExecutor
 )
 
 
@@ -387,3 +388,138 @@ def test_python_executor_run_exec_invalid_python_code():
     assert stderr.decode().strip() != ""
     assert stderr.decode().strip() == \
            "unsupported operand type(s) for +: 'int' and 'str'"
+
+
+# ==========================================================================================================
+# ============== PyInterpreterExecutor
+
+def test_pyinterpreter_executor_initialization(mocker):
+    """Test that PyInterpreterExecutor initializes correctly."""
+    executor = PyInterpreterExecutor(
+        shell_cmd="bash -c",
+        py_cmd="python -c",
+        posix=True,
+        comments=True,
+        use_shlex_quote=False
+    )
+
+    assert executor._cmd_grammar.shell_cmd == "bash -c"
+    assert executor._cmd_grammar.py_cmd == "python -c"
+    assert executor._posix is True
+    assert executor._comments is True
+    assert executor._use_shlex_quote is False
+
+
+def test_run_with_valid_python_code(mocker):
+    """Test that PyInterpreterExecutor runs valid Python code."""
+    executor = PyInterpreterExecutor(
+        shell_cmd="bash -c",
+        py_cmd="python -c"
+    )
+    x_stdout = b"mock_x_stdout"
+    x_stderr = b"mock_x_stderr"
+    py_code = "print('Hello World')"
+
+    stdout, stderr = executor.run(
+        x_stdout=x_stdout,
+        x_stderr=x_stderr,
+        py_code=py_code
+    )
+
+    assert stdout.strip() == b"Hello World"
+    assert stderr.strip() == b""
+
+
+def test_run_with_template_substitution(mocker):
+    """Test template substitution for x_stdout and x_stderr in the Python code."""
+    executor = PyInterpreterExecutor(
+        shell_cmd="bash -c",
+        py_cmd="python -c"
+    )
+    x_stdout = b"Hello"
+    x_stderr = b"World"
+    py_code = "result = $x_stdout.decode().strip() + ' ' + $x_stderr.decode().strip(); print(result)"
+
+    stdout, stderr = executor.run(
+        x_stdout=x_stdout,
+        x_stderr=x_stderr,
+        py_code=py_code
+    )
+
+    assert stdout.strip() == b"Hello World"
+    assert stderr.strip() == b""
+
+
+def test_run_with_invalid_python_code(mocker):
+    """Test that invalid Python code is correctly handled."""
+    executor = PyInterpreterExecutor(
+        shell_cmd="bash -c",
+        py_cmd="python -c"
+    )
+    x_stdout = b"Previous stdout"
+    x_stderr = b"Previous stderr"
+    py_code = "print(Hello World"  # Missing closing parenthesis
+
+    # Mock subprocess.Popen behavior
+    mock_popen = mocker.patch("subprocess.Popen", autospec=True)
+    mock_process = mock_popen.return_value
+    mock_process.communicate.return_value = (b"", b"SyntaxError: unexpected EOF while parsing")
+
+    stdout, stderr = executor.run(
+        x_stdout=x_stdout,
+        x_stderr=x_stderr,
+        py_code=py_code
+    )
+
+    # Assert that output is empty, but error is returned
+    assert stdout == b""
+    assert "SyntaxError" in stderr.decode()
+
+
+def test_run_with_timeout(mocker):
+    """Test that PyInterpreterExecutor handles timeout correctly."""
+    executor = PyInterpreterExecutor(
+        shell_cmd="bash -c",
+        py_cmd="python -c"
+    )
+    x_stdout = b"Previous stdout"
+    x_stderr = b"Previous stderr"
+    py_code = "import time; time.sleep(10)"  # Code that causes a long delay
+
+    # Mock subprocess.Popen behavior to simulate timeout
+    mock_popen = mocker.patch("subprocess.Popen", autospec=True)
+    mock_process = mock_popen.return_value
+    mock_process.communicate.side_effect = subprocess.TimeoutExpired("python", 10)
+
+    with pytest.raises(subprocess.TimeoutExpired):
+        executor.run(
+            x_stdout=x_stdout,
+            x_stderr=x_stderr,
+            py_code=py_code
+        )
+
+
+def test_run_with_empty_output(mocker):
+    """Test that PyInterpreterExecutor handles empty output correctly."""
+    executor = PyInterpreterExecutor(
+        shell_cmd="bash -c",
+        py_cmd="python -c"
+    )
+    x_stdout = b"Previous stdout"
+    x_stderr = b"Previous stderr"
+    py_code = "print('')"
+
+    # Mock subprocess.Popen behavior with empty output
+    mock_popen = mocker.patch("subprocess.Popen", autospec=True)
+    mock_process = mock_popen.return_value
+    mock_process.communicate.return_value = (b"", b"")
+
+    stdout, stderr = executor.run(
+        x_stdout=x_stdout,
+        x_stderr=x_stderr,
+        py_code=py_code
+    )
+
+    # Assert that both stdout and stderr are empty
+    assert stdout == b""
+    assert stderr == b""
