@@ -16,34 +16,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v2
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10
         with:
           python-version: '3.11'
 
-      - name: Install Poetry
+      - name: Install dependencies with uv
         run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Install dependencies with Poetry
-        run: |
-          poetry lock
-          poetry install --without dev --without test
+          uv sync --no-dev --no-group test
 
       - name: Build the package
         run: |
-          poetry build \
-            --format=wheel \
-            --no-interaction \
-            --no-cache \
+          uv build \
+            --wheel \
+            --out-dir dist \
             -v
 
       - name: Publish to PyPI
         env:
-          POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
         run: |
-          poetry publish \
-            --no-interaction \
-            --no-cache \
+          uv publish \
             --quiet

@@ -2,7 +2,7 @@ import time
 import pytest
 from testcontainers.core.container import DockerContainer
 
-# Important: Use `-s` in `poetry run pytest -s tests/ssh/test_***.py` to show output.
+# Important: Use `-s` in `uv run pytest -s tests/ssh/test_***.py` to show output.
 
 SYSBOX_IMAGE = "cedricanover94/sysbox-jammy:latest"
 RUNTIME = "sysbox-runc"

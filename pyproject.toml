@@ -1,16 +1,15 @@
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.poetry]
+[project]
 name = "marsh-lib"
 version = "0.2.0"
-#package-mode = true
 description = "Lightweight, extensible Python library for building, managing, and executing command workflows."
-authors = ["Cedric Anover <cedric.anover@hotmail.com>"]
-license = "MIT"
+authors = [{ name = "Cedric Anover", email = "cedric.anover@hotmail.com" }]
+license = { text = "MIT" }
 readme = "README.md"
-repository = "https://github.com/CedricAnover/marsh"
+requires-python = ">=3.10,<3.13"
 keywords = ["marsh", "marsh-lib"]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -25,30 +24,37 @@ classifiers = [
     "Topic :: System :: Systems Administration",
     "Topic :: Utilities",
     "Operating System :: Microsoft :: Windows",
-    "Operating System :: POSIX :: Linux"
+    "Operating System :: POSIX :: Linux",
+]
+dependencies = [
+    "fabric>=3.2.2,<4.0.0",
+    "docker>=7.1.0,<8.0.0",
 ]
 
-packages = [{include = "marsh", from = "src"}]
+[project.urls]
+Repository = "https://github.com/CedricAnover/marsh"
+
+[dependency-groups]
+dev = [
+    "pyproject-flake8>=7.0.0,<8.0.0", # Usage: `uv run pflake8`
+    "isort>=5.13.2,<6.0.0",
+    "black>=24.10.0,<25.0.0",
+    "fabric[pytest]>=3.2.2,<4.0.0",
+]
+test = [
+    "pytest>=8.3.2,<9.0.0",
+    "pytest-mock>=3.14.0,<4.0.0",
+    "testcontainers>=4.9.0,<5.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/marsh"]
+
+[tool.hatch.build.targets.sdist]
 exclude = [
-    "tests/",
-    "samples/"
+    "/tests",
+    "/samples",
 ]
-
-[tool.poetry.dependencies]
-python = ">=3.10,<3.13"
-fabric = "^3.2.2"
-docker = "^7.1.0"
-
-[tool.poetry.group.dev.dependencies]
-pyproject-flake8 = "^7.0.0"  # Usage: `poetry run pflake8`
-isort = "^5.13.2"
-black = "^24.10.0"
-fabric = {extras = ["pytest"], version = "^3.2.2"}
-
-[tool.poetry.group.test.dependencies]
-pytest = "^8.3.2"
-pytest-mock = "^3.14.0"
-testcontainers = "^4.9.0"
 
 [tool.flake8]
 max-line-length = 120
@@ -61,7 +67,7 @@ exclude = [
     "build",
     "dist",
     "venv",
-    ".venv"
+    ".venv",
 ]
 
 [tool.flake8.files]

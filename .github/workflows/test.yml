@@ -18,26 +18,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Set up Python
-        uses: actions/setup-python@v2
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10
         with:
           python-version: '3.10'
 
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
       - name: Install dependencies
         run: |
-          poetry install
-          poetry add coverage pytest-cov
+          uv sync --all-groups
 
       # TODO: Setup Docker for testing docker components (and possible ssh components).
       - name: Run pytest
         run: |
           cd src
-          poetry run pytest \
+          uv run --with coverage --with pytest-cov pytest \
             -vv --disable-warnings \
             --tb=short --cov-report xml:../coverage.xml --cov=marsh \
             --ignore=../tests/ssh/test_ssh_connector.py \

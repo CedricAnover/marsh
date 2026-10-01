@@ -2,7 +2,7 @@
 
 set -eu -o pipefail
 
-poetry run pytest \
+uv run pytest \
   -vv \
   --disable-warnings \
   --tb=short \

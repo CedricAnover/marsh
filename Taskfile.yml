@@ -22,7 +22,7 @@ tasks:
 #====================================================================
   lint:
     cmds:
-      - poetry run pflake8
+      - uv run pflake8
 #====================================================================
   test-all:
     internal: true
@@ -63,7 +63,7 @@ tasks:
     cmds:
       - echo "Testing with pytest excluding ssh and remote features..."
       - |
-        poetry run pytest \
+        uv run pytest \
           -vv \
           --disable-warnings \
           --tb=short \
@@ -74,7 +74,7 @@ tasks:
     cmds:
       - echo "Testing with Sysbox..."
       - |
-        poetry run pytest \
+        uv run pytest \
           -vv \
           --disable-warnings \
           --tb=short \
@@ -102,7 +102,7 @@ tasks:
       - rm -rf build/ dist/
 #====================================================================
   build:
-    desc: Build the package with poetry
+    desc: Build the package with uv
     vars:
       FORMAT: wheel
       PKG_OUTPUT: dist
@@ -110,15 +110,13 @@ tasks:
     cmd: |
       echo "Building ..."
 
-      poetry build \
-        --format={{.FORMAT}} \
-        --output={{.PKG_OUTPUT}} \
-        --no-interaction \
-        --no-cache \
-        -vvv
+      uv build \
+        --{{.FORMAT}} \
+        --out-dir {{.PKG_OUTPUT}} \
+        -v
 #====================================================================
   publish:
-    desc: Publish to PyPI with poetry
+    desc: Publish to PyPI with uv
     prompt: Do you want to continue?
     dotenv:
       - .env.pypi
@@ -126,8 +124,6 @@ tasks:
     cmds:
       - echo "Publishing to PyPI..."
       - |
-        poetry publish \
-          --no-cache \
-          --no-interaction \
-          -vvv
+        uv publish \
+          -v
 #====================================================================
