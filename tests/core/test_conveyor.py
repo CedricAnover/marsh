@@ -1,6 +1,6 @@
 import pytest
 
-from marsh.core import Conveyor
+from marsh.core import Conveyor, CmdRunDecorator, CmdRunnerSpec
 
 
 @pytest.fixture
@@ -173,3 +173,90 @@ def test_conveyor_with_mixed_outputs():
     stdout, stderr = conveyor(b"init", b"init_err")
     assert stdout == b"stdout1 final"
     assert stderr == b"stderr2 final"
+
+
+# --- Conveyor.from_specs ---
+
+
+def test_from_specs_empty():
+    conveyor = Conveyor.from_specs()
+
+    assert len(conveyor.cmd_run_triples) == 0
+    stdout, stderr = conveyor(b"in", b"err")
+    assert stdout == b"in"
+    assert stderr == b"err"
+
+
+def test_from_specs_single_bare_tuple():
+    def f(x_stdout, x_stderr):
+        return x_stdout + b"f", x_stderr
+
+    conveyor = Conveyor.from_specs((f,))
+    stdout, stderr = conveyor(b"start", b"")
+
+    assert stdout == b"startf"
+    assert stderr == b""
+
+
+def test_from_specs_single_spec():
+    def f(x_stdout, x_stderr):
+        return x_stdout + b"f", x_stderr
+
+    conveyor = Conveyor.from_specs(CmdRunnerSpec(f))
+    stdout, stderr = conveyor(b"start", b"")
+
+    assert stdout == b"startf"
+
+
+def test_from_specs_with_args():
+    def f(x_stdout, x_stderr, suffix):
+        return x_stdout + suffix, x_stderr
+
+    conveyor = Conveyor.from_specs((f, (b"x",)))
+    stdout, stderr = conveyor(b"start", b"")
+
+    assert stdout == b"startx"
+
+
+def test_from_specs_with_kwargs():
+    def f(x_stdout, x_stderr, suffix=b""):
+        return x_stdout + suffix, x_stderr
+
+    conveyor = Conveyor.from_specs((f, {"suffix": b"y"}))
+    stdout, stderr = conveyor(b"start", b"")
+
+    assert stdout == b"starty"
+
+
+def test_from_specs_with_decorator():
+    def f(x_stdout, x_stderr):
+        return x_stdout + b"f", x_stderr
+
+    def mod_func(x_stdout, x_stderr):
+        return x_stdout.upper(), x_stderr
+
+    decorator = CmdRunDecorator().add_mod_processor(mod_func, before=False)
+    conveyor = Conveyor.from_specs((f, decorator))
+    stdout, stderr = conveyor(b"start", b"")
+
+    assert stdout == b"STARTF"
+    assert stderr == b""
+
+
+def test_from_specs_multiple_mixed():
+    def f1(x_stdout, x_stderr):
+        return x_stdout + b"1", x_stderr
+
+    def f2(x_stdout, x_stderr):
+        return x_stdout + b"2", x_stderr
+
+    conveyor = Conveyor.from_specs((f1,), CmdRunnerSpec(f2))
+    stdout, stderr = conveyor(b"start", b"")
+
+    assert stdout == b"start12"
+    assert stderr == b""
+
+
+def test_from_specs_invalid_tuple_raises():
+    with pytest.raises(TypeError):
+        Conveyor.from_specs(("not callable",))

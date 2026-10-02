@@ -38,6 +38,33 @@ class Node(Startable):
         # Conveyor keyword arguments for __call__
         self._kwargs = kwargs
 
+    @classmethod
+    def from_cmd_runners(cls, name: str, *cmd_runners) -> "Node":
+        """
+        Builds a Node from one or more command runners.
+
+        This is a convenience factory that constructs a `Conveyor` from the given
+        command runners (each a `CmdRunnerSpec` or a tuple shape accepted by
+        `CmdRunnerSpec.coerce`) and wraps it in a Node. It is equivalent to
+        `cls(name, Conveyor.from_specs(*cmd_runners))`.
+
+        Args:
+            name (str): The name of the node.
+            *cmd_runners: One or more `CmdRunnerSpec` instances or tuples describing
+                the command runners to chain, in execution order.
+
+        Returns:
+            Node: A new Node whose `Conveyor` chains the given command runners.
+
+        Raises:
+            ValueError: If no command runners are provided.
+            TypeError: If any command runner cannot be normalized by
+                `CmdRunnerSpec.coerce`.
+        """
+        if not cmd_runners:
+            raise ValueError("from_cmd_runners requires at least one command runner.")
+        return cls(name, Conveyor.from_specs(*cmd_runners))
+
     @result_logging_decorator(__name__)
     def start(self) -> Tuple[bytes, bytes]:
         """

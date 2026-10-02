@@ -311,6 +311,21 @@ conveyor = Conveyor().add_cmd_runner(cmd_runner, ...)
 node = Node("node_name", conveyor, **run_kwargs)
 ```
 
+A `Node` can also be built directly from one or more command runners (with their
+optional positional arguments, keyword arguments, and `CmdRunDecorator`) via the
+`from_cmd_runners` classmethod:
+
+```python
+from marsh.dag import Node
+
+node = Node.from_cmd_runners(
+    "node_name",
+    cmd_runner_a,                                   # bare callable
+    (cmd_runner_b, ("arg1",), {"key": "value"}),    # (runner, args, kwargs)
+    (cmd_runner_c, decorator),                      # (runner, decorator)
+)
+```
+
 #### Defining and Running a Dag
 
 ```python
