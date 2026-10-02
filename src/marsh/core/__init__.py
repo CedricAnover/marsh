@@ -1,4 +1,5 @@
 from marsh.core.conveyor import Conveyor
+from marsh.core.cmd_runner_spec import CmdRunnerSpec
 from marsh.core.command_grammar import CommandGrammar, PyCommandGrammar
 from marsh.core.authenticator import Authenticator
 from marsh.core.connector import Connector

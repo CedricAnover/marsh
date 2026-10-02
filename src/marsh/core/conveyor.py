@@ -1,6 +1,7 @@
 from typing import Callable, Tuple, Sequence
 
 from .cmd_run_decorator import CmdRunDecorator
+from .cmd_runner_spec import CmdRunnerSpec
 
 
 class Conveyor:
@@ -74,6 +75,38 @@ class Conveyor:
         decorated_cmd_runner = cmd_runner_decorator.decorate(cmd_runner) if isinstance(cmd_runner_decorator, CmdRunDecorator) else cmd_runner
 
         return Conveyor(cmds_=self._cmd_runners + [(decorated_cmd_runner, args, kwargs)])
+
+    @classmethod
+    def from_specs(cls, *specs) -> "Conveyor":
+        """
+        Builds a Conveyor from one or more command runner specifications.
+
+        Each spec is a `CmdRunnerSpec` or one of the tuple shapes accepted by
+        `CmdRunnerSpec.coerce` (e.g. `(cmd_runner,)`, `(cmd_runner, args)`,
+        `(cmd_runner, kwargs)`, `(cmd_runner, decorator)`, or a full
+        `(cmd_runner, args, kwargs, decorator)`).
+
+        Args:
+            *specs: One or more `CmdRunnerSpec` instances or tuples describing the
+                command runners to chain, in execution order.
+
+        Returns:
+            Conveyor: A new Conveyor with the given command runners added in order.
+                An empty `Conveyor` is returned when no specs are provided.
+
+        Raises:
+            TypeError: If any spec cannot be normalized by `CmdRunnerSpec.coerce`.
+        """
+        conveyor = cls()
+        for spec in specs:
+            spec = CmdRunnerSpec.coerce(spec)
+            conveyor = conveyor.add_cmd_runner(
+                spec.cmd_runner,
+                *spec.args,
+                cmd_runner_decorator=spec.decorator,
+                **spec.kwargs,
+            )
+        return conveyor
 
     def __call__(self, x_stdout: bytes = b"", x_stderr: bytes = b"", callback_list_: Sequence = None) -> Tuple[bytes, bytes]:
         """
