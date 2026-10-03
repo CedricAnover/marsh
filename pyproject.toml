@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "marsh-lib"
-version = "0.2.0"
+version = "0.3.0"
 description = "Lightweight, extensible Python library for building, managing, and executing command workflows."
 authors = [{ name = "Cedric Anover", email = "cedric.anover@hotmail.com" }]
 license = { text = "MIT" }
@@ -76,5 +76,5 @@ include = ["src/**/*.py"]
 [tool.black]
 line-length = 88
 target-version = ['py310', 'py311', 'py312', 'py313']
-include = '\.pyi?$'
+include = '\\.pyi?$'
 #extend-exclude = '...'
