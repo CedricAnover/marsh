@@ -164,10 +164,10 @@ class LocalProcess:
             if self._process.returncode == 0
             else ProcessStatus.FAILED
         )
-        error = None if status is ProcessStatus.COMPLETED else (
-            f"process exited with code {self._process.returncode}"
-            if status is ProcessStatus.FAILED
-            else "process was cancelled"
+        error = (
+            None
+            if status in {ProcessStatus.COMPLETED, ProcessStatus.CANCELLED}
+            else f"process exited with code {self._process.returncode}"
         )
         return self._finish(stdout, stderr, self._process.returncode, status, error)
 
