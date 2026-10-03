@@ -108,5 +108,4 @@ workflows:
       - lint
       - docker-integration-lifecycle
       - docker-integration-command
-      - docker-integration
       - build
