@@ -10,6 +10,8 @@ jobs:
     resource_class: medium
     steps:
       - checkout
+      - setup_remote_docker:
+          docker_layer_caching: false
       - run:
           name: Install uv
           command: |
@@ -27,8 +29,8 @@ jobs:
               --ignore=tests/docker/
 
   docker-integration:
-    machine:
-      image: ubuntu-2204:current
+    docker:
+      - image: cimg/python:3.12
     resource_class: medium
     steps:
       - checkout
