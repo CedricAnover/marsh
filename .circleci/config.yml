@@ -38,9 +38,6 @@ jobs:
             python -m pip install --upgrade pip
             python -m pip install uv
       - run:
-          name: Install dependencies
-          command: uv sync --all-groups
-      - run:
           name: Run pflake8
           command: uv run pflake8 src/marsh --select=E9,F --ignore=F401,F403,F405,F541,F811,F841
 
@@ -56,9 +53,6 @@ jobs:
             python -m pip install --upgrade pip
             python -m pip install uv
       - run:
-          name: Install dependencies
-          command: uv sync --all-groups
-      - run:
           name: Build wheel
           command: uv build --wheel --out-dir dist -v
 
@@ -69,21 +63,6 @@ jobs:
     resource_class: medium
     steps:
       - checkout
-      - run:
-          name: Install Sysbox CE
-          command: |
-            set -euxo pipefail
-            sudo apt-get update
-            sudo apt-get install -y jq wget
-            SYSBOX_VERSION=0.7.0
-            SYSBOX_DEB=sysbox-ce_${SYSBOX_VERSION}-0.linux_amd64.deb
-            wget -q https://downloads.nestybox.com/sysbox/releases/v${SYSBOX_VERSION}/${SYSBOX_DEB}
-            echo "eeff273671467b8fa351ab3d40709759462dc03d9f7b50a1b207b37982ce40a9  ${SYSBOX_DEB}" | sha256sum -c -
-            sudo docker rm -f $(sudo docker ps -aq) || true
-            sudo apt-get install -y ./${SYSBOX_DEB}
-            sudo systemctl restart docker
-            sudo systemctl is-active --quiet docker
-            sudo docker info --format '{{json .Runtimes}}' | grep -q 'sysbox-runc'
       - run:
           name: Install uv
           command: |
