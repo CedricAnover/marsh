@@ -364,3 +364,59 @@ result = result_dict["node_or_dag_name"]  # Get result from individual startable
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+
+---
+
+## Canonical Workflow API (Python)
+
+The additive workflow API uses the same `Workflow` IR and runtime as the lower-level
+execution components. A workflow can be validated and inspected before execution:
+
+```python
+import sys
+
+from marsh import ProcessSpec, Task, Workflow
+from marsh import execute_workflow, plan_workflow, validate_workflow
+
+workflow = Workflow(
+    id="hello",
+    tasks=(
+        Task(
+            id="greet",
+            operation=ProcessSpec(
+                executable=sys.executable,
+                arguments=("-c", "print('hello')"),
+            ),
+        ),
+    ),
+)
+
+# Validation returns a deterministic topological task order.
+order = validate_workflow(workflow)
+plan = plan_workflow(workflow)
+
+# Execute through the same sequential local runtime.
+results = execute_workflow(workflow)
+assert results["greet"].ok
+print(results["greet"].stdout.decode())
+```
+
+For a complete runnable example, see [samples/workflow_ir_sample.py](samples/workflow_ir_sample.py).
+
+### API boundaries and limitations
+
+- `Workflow`, `Task`, and `ProcessSpec` are the Python authoring primitives.
+- `validate_workflow` checks dependency semantics and returns deterministic order;
+  `plan_workflow` exposes the execution order and initially ready tasks.
+- `execute_workflow` currently runs sequentially using the local runtime.
+- Mapping/JSON normalization and deterministic serialization are available through
+  `normalize_workflow`, `workflow_from_dict`, `workflow_from_json`,
+  `workflow_to_dict`, and `workflow_to_json`.
+- Callable task operations are Python-only and cannot be represented by deterministic
+  JSON serialization. Use data-oriented `ProcessSpec` operations for portable examples.
+- YAML authoring and a separate CLI are not currently provided. The existing Python API
+  is the selected first UX surface; adding another adapter remains a separately justified
+  extension, not a parallel execution path.
+- Optional remote/container integrations continue to use their existing modules; the
+  canonical local workflow API does not make them mandatory.
