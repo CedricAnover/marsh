@@ -8,11 +8,11 @@ class Conveyor:
     """
     A class that chains multiple command runners, allowing sequential execution of commands.
 
-    Each command runner is a callable that accepts two `bytes` arguments (representing standard 
+    Each command runner is a callable that accepts two `bytes` arguments (representing standard
     output and standard error) and returns a tuple of two `bytes` values as the updated outputs.
 
     This class supports adding command runners, decorating them, and invoking them in sequence.
-    
+
     Example:
         >>> def cmd_runner_1(stdout: bytes, stderr: bytes) -> Tuple[bytes, bytes]:
         ...     return stdout + b"Cmd1", stderr
@@ -35,7 +35,7 @@ class Conveyor:
         Returns the sequence of triples containing the registered command runner, its positional arguments and keyword arguments.
 
         Returns:
-            Sequence[Tuple[Callable, Tuple, dict]]: 
+            Sequence[Tuple[Callable, Tuple, dict]]:
                 A sequence of command runners with their arguments.
         """
         return self._cmd_runners
@@ -52,14 +52,14 @@ class Conveyor:
         Optionally applies a decorator to the command runner before adding it to the chain.
 
         Args:
-            cmd_runner (Callable[[bytes, bytes], Tuple[bytes, bytes]]): 
-                A callable that processes two `bytes` inputs (stdout, stderr) 
+            cmd_runner (Callable[[bytes, bytes], Tuple[bytes, bytes]]):
+                A callable that processes two `bytes` inputs (stdout, stderr)
                 and returns a tuple of two `bytes` outputs.
-            *args: 
+            *args:
                 Positional arguments to pass to the `cmd_runner` during invocation.
-            cmd_runner_decorator (CmdRunDecorator, optional): 
+            cmd_runner_decorator (CmdRunDecorator, optional):
                 A command runner decorator for decorating the `cmd_runner`. Defaults to None.
-            **kwargs: 
+            **kwargs:
                 Keyword arguments to pass to the `cmd_runner` during invocation.
 
         Returns:
@@ -118,11 +118,11 @@ class Conveyor:
         Args:
             x_stdout (bytes, optional): Initial standard output. Defaults to `b""`.
             x_stderr (bytes, optional): Initial standard error. Defaults to `b""`.
-            callback_list_ (Sequence, optional): 
+            callback_list_ (Sequence, optional):
                 A list of command runners to execute. Defaults to the command runners in the Conveyor.
 
         Returns:
-            Tuple[bytes, bytes]: 
+            Tuple[bytes, bytes]:
                 A tuple containing the final standard output (`stdout`) and standard error (`stderr`).
         """
         callback_list = callback_list_ or self._cmd_runners
