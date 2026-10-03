@@ -1,8 +1,15 @@
 import os
 
+import pytest
+
 from marsh.ssh import SshConnector
 
 
+@pytest.mark.skipif(
+    not os.environ.get("MARSH_SSH_TARGET")
+    or not os.environ.get("MARSH_SSH_PASSWORD"),
+    reason="local SSH smoke target/password not configured",
+)
 def test_ssh_local_server_smoke():
     connector = SshConnector()
     connection = connector.connect(

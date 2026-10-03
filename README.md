@@ -582,6 +582,8 @@ remain important compatibility surfaces.
 
 New functionality should prefer the canonical workflow contracts and adapt existing mechanisms into them rather than introducing a separate execution model.
 
+For migration examples and legacy/deprecation guidance, see [`docs/api-migration.md`](docs/api-migration.md).
+
 ## Contributing
 
 Before making architectural or public-interface changes:
