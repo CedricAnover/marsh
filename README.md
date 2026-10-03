@@ -1,383 +1,68 @@
 # Marsh
 
-**Marsh** is a lightweight Python library for building, managing, and executing command workflows. It allows chaining
-commands, defining custom pre/post processing logic, creating DAG workflows, and structuring flexible CLI workflows.
-With support for local, remote, Docker-based, and Python execution, Marsh simplifies automating pipelines and
-integrating external processes.
+**Marsh** is a lightweight, extensible Python library for building, validating, planning, and executing command workflows.
 
----
+Marsh separates **workflow definition** from **execution**. Work can be represented explicitly, validated before execution, inspected as an execution plan, and then executed through a runtime.
+
+The project is evolving toward a small, dependency-light workflow and execution kernel while preserving its existing command, executor, and DAG APIs.
+
+> **Project status:** Alpha
+
+## Features
+
+- **Workflow API** — define workflows with `Workflow`, `Task`, and `ProcessSpec`.
+- **Validation and planning** — validate dependencies and inspect deterministic execution order before running.
+- **Structured results** — execution produces structured `Result` objects rather than relying only on `(stdout, stderr)` tuples.
+- **Command composition** — compose command runners with `Conveyor`.
+- **Processors and modifiers** — add validation, logging, transformation, and other reusable command behavior.
+- **DAG workflows** — model dependencies with the existing DAG API.
+- **Multiple execution mechanisms** — local, SSH, Docker, and Python execution are available through existing APIs.
+- **Composable architecture** — workflow semantics are separated from execution mechanisms and policies.
+
+## Requirements
+
+Marsh currently supports:
+
+- Python 3.10
+- Python 3.11
+- Python 3.12
+
+The current package has runtime dependencies on:
+
+- Fabric
+- Docker
+
+These dependencies support the existing SSH and Docker integrations.
 
 ## Installation
 
-Install Marsh via pip:
-```text
+Install the package from PyPI:
+
+```bash
 pip install marsh-lib
 ```
 
----
+For development:
 
-## Key Features
-
-- **Command Chains:** Chain multiple commands into reusable workflows.
-- **Pre/Post Processors:** Add validation, logging, or error handling without modifying data.
-- **Pre/Post Modifiers:** Transform input/output data during command execution.
-- **Execution Options:** Local, Remote, Docker, Python, and custom runners.
-- **DAG Workflows:** Support for DAG to define and run task dependencies.
-
----
-
-## Quick Start
-
-### Workflow with `Conveyor`
-
-```python
-from marsh import Conveyor
-
-def cmd_1(stdout, stderr): return stdout.upper(), stderr
-def cmd_2(stdout, stderr): return stdout, stderr.lower()
-
-# Chain commands with Conveyor
-conveyor = Conveyor().add_cmd_runner(cmd_1).add_cmd_runner(cmd_2)
-stdout, stderr = conveyor(b"input", b"ERROR")
-print(stdout, stderr)
+```bash
+uv sync --all-groups
 ```
 
-**Output:**  
-```text
-INPUT error
-```
+## Quick start
 
----
-
-### Pre/Post Processors: Validating or Logging Data
-
-**Processors** perform actions (e.g., logging, validation) without modifying data.
-
-```python
-from marsh import CmdRunDecorator
-
-def validate(stdout, stderr): assert not stderr.strip()      # Validate no errors
-def log(stdout, stderr): print(f"LOG: {stdout.decode()}")    # Log output
-
-decorator = CmdRunDecorator()\
-  .add_processor(validate, before=True)\
-  .add_processor(log, before=False)
-
-def cmd_runner(stdout, stderr): return stdout, stderr
-decorated_runner = decorator.decorate(cmd_runner)
-stdout, stderr = decorated_runner(b"Hello", b"")
-```
-
-**Output:**  
-```text
-LOG: Hello
-```
-
----
-
-### Pre/Post Modifiers: Transforming Data
-
-**Modifiers** transform the data before or after a command runs. Unlike processors, modifiers must return `(stdout, stderr)`.
-
-```python
-def to_upper(stdout, stderr): return stdout.upper(), stderr
-def add_prefix(stdout, stderr): return b"Prefix: " + stdout, stderr
-
-decorator = CmdRunDecorator()\
-  .add_mod_processor(to_upper, before=True)\
-  .add_mod_processor(add_prefix, before=False)
-
-def cmd_runner(stdout, stderr): return stdout, stderr
-decorated_runner = decorator.decorate(cmd_runner)
-stdout, stderr = decorated_runner(b"hello", b"")
-print(stdout.decode())
-```
-
-**Output:**  
-```text
-Prefix: HELLO
-```
-
-**Key Difference:**  
-- **Processors** act on data without altering it.  
-- **Modifiers** transform the data and return new values.
-
-⚠️ **IMPORTANT:**  
-> **Order of Evaluation for Processors and Modifiers**
-> 
-> 1. **Pre-Modifiers**  
-> 2. **Pre-Processors**  
-> 3. **Command Runner**  
-> 4. **Post-Modifiers**  
-> 5. **Post-Processors**  
-
----
-
-### Passing `CmdRunDecorator` instance as parameter for reusabiliity
-
-```python
-from marsh import Conveyor, CmdRunDecorator
-
-decorator = CmdRunDecorator().add_processor(...).add_mod_processor(...)
-conveyor = Conveyor().add_cmd_runner(cmd_runner, cmd_runner_decorator=decorator)
-stdout, stderr = conveyor()
-```
-
----
-
-### Using `@add_processors_and_modifiers` for decorating command runners
-
-```python
-from marsh import add_processors_and_modifiers
-
-
-@add_processors_and_modifiers(
-    ("mod", True, pre_mod_func, arg_tuple, kwg_dict),      # Pre-Modifier
-    ("proc", True, pre_proc_func, arg_tuple, kwg_dict),    # Pre-Processor
-    ("mod", False, post_mod_func, arg_tuple, kwg_dict),    # Post-Modifier
-    ("proc", False, post_proc_func, arg_tuple, kwg_dict),  # Post-Processor
-)
-def cmd_runner(x_stdout: bytes, x_stderr: bytes):
-    ...
-    return b"stdout", b"stderr"
-```
-
----
-
-### Running Local Commands with `BashFactory`
-
-#### Simple Local Command
-```python
-from marsh.bash import BashFactory
-
-bash = BashFactory()
-cmd = bash.create_cmd_runner(r'echo "Hello, $NAME"', env={"NAME": "World"})
-stdout, stderr = cmd(b"", b"")
-```
-
-#### Examples with `BashFactory`
-```python
-from pathlib import Path
-from marsh.bash import BashFactory
-
-bash = BashFactory()
-
-# Inject Environment Variables
-cmd1 = bash.create_cmd_runner(
-    r'echo "($ENV_VAR_1, $ENV_VAR_2)"',
-    env={
-        "ENV_VAR_1": "value1",
-        "ENV_VAR_2": "value2"
-    }
-)
-
-# Change Working Directory
-cmd2 = bash.create_cmd_runner(r'echo "CWD: $PWD"', cwd=str(Path.cwd().parent))
-
-# Unix Pipes
-cmd3 = bash.create_cmd_runner(r'echo -e "Line1\nLine2\nLine3"')
-cmd4 = bash.create_cmd_runner(r'grep 2 | sort', executor_kwargs={"pipe_prev_stdout": True})
-
-# Python Command
-cmd5 = bash.create_cmd_runner(r'python -c "print(\"Hello Python\")"')
-
-# Custom Callback
-import subprocess
-def custom_callback(popen: subprocess.Popen, stdout, stderr):
-    return popen.communicate(input=b"Custom Input")
-cmd6 = bash.create_cmd_runner(r'xargs echo', callback=custom_callback)
-
-# Combine in Conveyor
-from marsh import Conveyor
-conveyor = Conveyor()\
-    .add_cmd_runner(cmd1)\
-    .add_cmd_runner(cmd2)\
-    .add_cmd_runner(cmd3)\
-    .add_cmd_runner(cmd4)\
-    .add_cmd_runner(cmd5)\
-    .add_cmd_runner(cmd6)
-
-stdout, stderr = conveyor()
-```
-
----
-
-### Running Remote Commands with `SshFactory`
-
-```python
-from marsh import Conveyor
-from marsh.ssh import SshFactory
-
-ssh = SshFactory(("user@host:port",), {"connect_kwargs": {"password": "the_ssh_password"}})
-cmd1 = ssh.create_cmd_runner("echo Hello, Remote World")
-cmd2 = ssh.create_chained_cmd_runner(["echo Hi", "echo there"])
-conveyor = Conveyor().add_cmd_runner(cmd1).add_cmd_runner(cmd2)
-stdout, stderr = conveyor()
-```
-
----
-
-### Running Commands with `DockerCommandExecutor`
-
-```python
-from marsh.docker.docker_executor import DockerCommandExecutor
-
-docker_executor = DockerCommandExecutor("bash:latest", ...)
-
-stdout, stderr = docker_executor.run(
-    b"x_stdout", b"x_stderr",
-    environment=dict(ENV_VAR_1="value1", ENV_VAR_2="value2"),
-    workdir="/app"
-)
-```
-
----
-
-### Running Commands with `PythonExecutor`
-
-#### `eval` mode for evaluating python expressions
-
-```python
-from marsh import PythonExecutor
-
-py_code = """x + y"""     # Python Evaluatable Expression
-
-python_executor = PythonExecutor(
-    py_code,
-    mode="eval",
-    namespace=dict(x=1, y=2),
-    use_pickle=False,
-)
-
-stdout, stderr = python_executor.run(b"x_stdout", b"x_stderr", ...)
-
-```
-
-#### `exec` mode for executing python statements
-
-```python
-from marsh import PythonExecutor
-
-py_code = """
-import os
-import sys
-
-prev_stdout = x_stdout    #<-- Use `x_stdout` to get the previous STDOUT
-prev_stderr = x_stderr    #<-- Use `x_stderr` to get the previous STDERR
-exec_result = x + y       #<-- Use `exec_result` for storing results and passing to STDOUT
-"""
-
-python_executor = PythonExecutor(
-    py_code,
-    mode="exec",
-    namespace=dict(x=1, y=2),
-    use_pickle=False,
-)
-
-stdout, stderr = python_executor.run(b"x_stdout", b"x_stderr", ...)
-
-```
-
-**Note:** `eval` mode also have access to `x_stdout` and `x_stderr` but not `exec_result`.
-
----
-
-### DAG Workflow
-
-The DAG extends the capabilities of the core components by allowing non-linear dependencies between tasks.
-
-The DAG subpackage has two main components: `Node` and `Dag`. The `Node` encapsulates a `Conveyor` that represents a
-_task_ in the workflow, while the `Dag` represents the whole workflow and task dependencies.
-
-Note that the `Dag` manages `Startable` objects, which is the abstract base class for both `Node` and `Dag`. This means
-that a `Dag` can contain both `Node` objects and other `Dag` objects.
-
-**Different kinds of `Dag`:**
-
-- `SyncDag`
-- `AsyncDag`
-- `ThreadDag`
-- `ThreadPoolDag`
-- `MultiprocessDag`
-- `ProcessPoolDag`
-
-#### Defining Nodes
-
-```python
-from marsh import Conveyor
-from marsh.dag import Node
-
-conveyor = Conveyor().add_cmd_runner(cmd_runner, ...)
-node = Node("node_name", conveyor, **run_kwargs)
-```
-
-A `Node` can also be built directly from one or more command runners (with their
-optional positional arguments, keyword arguments, and `CmdRunDecorator`) via the
-`from_cmd_runners` classmethod:
-
-```python
-from marsh.dag import Node
-
-node = Node.from_cmd_runners(
-    "node_name",
-    cmd_runner_a,                                   # bare callable
-    (cmd_runner_b, ("arg1",), {"key": "value"}),    # (runner, args, kwargs)
-    (cmd_runner_c, decorator),                      # (runner, decorator)
-)
-```
-
-#### Defining and Running a Dag
-
-```python
-from marsh.dag import SyncDag
-
-dag = SyncDag("dag_name")
-
-# Register Nodes
-dag.do(node_a)
-dag.do(node_a).then(node_b, node_c)       # A --> {B, C}
-dag.do(node_a).when(node_b, node_c)       # {B, C} --> A
-dag.do(other_dag).then(node_a)            # Register other Dag
-...
-
-result_dict = dag.start()                 # Run the Dag
-result = result_dict["node_or_dag_name"]  # Get result from individual startables
-```
-
-⚠️ **IMPORTANT:**
-
-- `MultiprocessDag` and `ProcessPoolDag` requires the `start()` method to run in scope of `if __name__ == "__main__"`.
-  ```python
-  from marsh.dag import MultiprocessDag, ProcessPoolDag
-  
-  ...
-  
-  if __name__ == "__main__":
-      ...
-      dag.start()
-      ...
-  ```
-- As of the latest version, marsh DAG does not support **_result passing_** between task dependencies.
-
----
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-
----
-
-## Canonical Workflow API (Python)
-
-The additive workflow API uses the same `Workflow` IR and runtime as the lower-level
-execution components. A workflow can be validated and inspected before execution:
+For new code, the **canonical Workflow API** is the recommended starting point.
 
 ```python
 import sys
 
-from marsh import ProcessSpec, Task, Workflow
-from marsh import execute_workflow, plan_workflow, validate_workflow
+from marsh import (
+    ProcessSpec,
+    Task,
+    Workflow,
+    execute_workflow,
+    plan_workflow,
+    validate_workflow,
+)
 
 workflow = Workflow(
     id="hello",
@@ -386,37 +71,532 @@ workflow = Workflow(
             id="greet",
             operation=ProcessSpec(
                 executable=sys.executable,
-                arguments=("-c", "print('hello')"),
+                arguments=("-c", "print('hello from Marsh')"),
             ),
         ),
     ),
 )
 
-# Validation returns a deterministic topological task order.
+# Validate the workflow and obtain deterministic task order.
 order = validate_workflow(workflow)
+
+# Inspect the execution plan before running anything.
 plan = plan_workflow(workflow)
 
-# Execute through the same sequential local runtime.
+print(order)
+print(plan.ready)
+
+# Execute the workflow.
 results = execute_workflow(workflow)
-assert results["greet"].ok
-print(results["greet"].stdout.decode())
+
+result = results["greet"]
+
+if not result.ok:
+    raise RuntimeError(result.error)
+
+print(result.stdout.decode().strip())
 ```
 
-For a complete runnable example, see [samples/workflow_ir_sample.py](samples/workflow_ir_sample.py).
+A complete runnable example is available in [`samples/workflow_ir_sample.py`](samples/workflow_ir_sample.py).
 
-### API boundaries and limitations
+## Core concepts
 
-- `Workflow`, `Task`, and `ProcessSpec` are the Python authoring primitives.
-- `validate_workflow` checks dependency semantics and returns deterministic order;
-  `plan_workflow` exposes the execution order and initially ready tasks.
-- `execute_workflow` currently runs sequentially using the local runtime.
-- Mapping/JSON normalization and deterministic serialization are available through
-  `normalize_workflow`, `workflow_from_dict`, `workflow_from_json`,
-  `workflow_to_dict`, and `workflow_to_json`.
-- Callable task operations are Python-only and cannot be represented by deterministic
-  JSON serialization. Use data-oriented `ProcessSpec` operations for portable examples.
-- YAML authoring and a separate CLI are not currently provided. The existing Python API
-  is the selected first UX surface; adding another adapter remains a separately justified
-  extension, not a parallel execution path.
-- Optional remote/container integrations continue to use their existing modules; the
-  canonical local workflow API does not make them mandatory.
+### Workflow
+
+A `Workflow` is the top-level representation of work.
+
+```python
+Workflow(
+    id="pipeline",
+    tasks=(...),
+    inputs={...},
+    outputs={...},
+    metadata={...},
+)
+```
+
+A workflow describes **what should happen** without coupling the definition to a particular execution mechanism.
+
+### Task
+
+A `Task` represents one unit of work and its dependencies.
+
+```python
+Task(
+    id="test",
+    operation=...,
+    dependencies=("build",),
+)
+```
+
+Dependencies currently express execution ordering.
+
+The canonical runtime does not yet provide general automatic output-to-input dataflow between dependent tasks.
+
+### ProcessSpec
+
+`ProcessSpec` describes a process without executing it.
+
+```python
+ProcessSpec(
+    executable="python",
+    arguments=("-c", "print('hello')"),
+    environment={"MODE": "development"},
+    working_directory="/tmp",
+    timeout=30,
+)
+```
+
+Keeping process descriptions explicit makes them easier to validate, inspect, serialize, and execute through different mechanisms.
+
+### Result
+
+Canonical workflow execution returns structured results.
+
+A result can contain:
+
+```python
+result.stdout
+result.stderr
+result.exit_code
+result.status
+result.error
+result.duration
+result.metadata
+result.ok
+```
+
+A non-empty `stderr` does **not** automatically mean that execution failed. Failure is represented by execution status, exit code, exceptions, timeouts, provider errors, or other applicable execution semantics.
+
+## Validate before executing
+
+Workflow validation is separate from execution:
+
+```python
+order = validate_workflow(workflow)
+```
+
+Validation checks workflow structure and dependency semantics, including:
+
+- task identifiers;
+- dependency references;
+- dependency cycles.
+
+The returned order is deterministic.
+
+This allows applications to reject invalid workflows before executing them.
+
+## Inspect the execution plan
+
+Use `plan_workflow()` when the application needs to inspect execution before starting it:
+
+```python
+plan = plan_workflow(workflow)
+
+print(plan.order)
+print(plan.ready)
+```
+
+The current execution plan exposes the deterministic task order and initially ready tasks.
+
+## Execute a workflow
+
+Execute a validated workflow with:
+
+```python
+results = execute_workflow(workflow)
+```
+
+The current canonical runtime uses a **sequential local execution model**.
+
+Conceptually:
+
+```mermaid
+flowchart TD
+    A[Workflow] --> B[Validation]
+    B --> C[Execution Plan]
+    C --> D[Sequential Scheduler]
+    D --> E[Local Process Execution]
+    E --> F[Structured Results]
+```
+
+The workflow model is intentionally separated from the runtime so additional scheduling and execution mechanisms can be introduced without creating another workflow engine.
+
+## Workflow dependencies
+
+Dependencies are declared explicitly:
+
+```python
+workflow = Workflow(
+    id="pipeline",
+    tasks=(
+        Task(
+            id="build",
+            operation=ProcessSpec(
+                executable="python",
+                arguments=("-c", "print('build')"),
+            ),
+        ),
+        Task(
+            id="test",
+            operation=ProcessSpec(
+                executable="python",
+                arguments=("-c", "print('test')"),
+            ),
+            dependencies=("build",),
+        ),
+    ),
+)
+```
+
+The dependency graph is validated before execution.
+
+For the example above, the dependency relationship is:
+
+```mermaid
+flowchart LR
+    build --> test
+```
+
+The current canonical scheduler executes tasks sequentially in deterministic topological order.
+
+## Mapping and JSON workflows
+
+Workflow definitions can be normalized from mappings and JSON:
+
+```python
+from marsh import (
+    workflow_from_dict,
+    workflow_from_json,
+    workflow_to_dict,
+    workflow_to_json,
+)
+```
+
+For example:
+
+```python
+workflow = workflow_from_dict(
+    {
+        "id": "hello",
+        "tasks": [
+            {
+                "id": "greet",
+                "operation": ...,
+            }
+        ],
+    }
+)
+```
+
+Data-oriented workflow definitions are preferred when serialization or portability is required.
+
+Arbitrary Python callables are Python objects and therefore are not general portable JSON representations.
+
+## Existing command API
+
+Marsh's original command-composition API remains available.
+
+### `Conveyor`
+
+`Conveyor` chains command runners together.
+
+```python
+from marsh import Conveyor
+
+def uppercase(stdout, stderr):
+    return stdout.upper(), stderr
+
+def lowercase_error(stdout, stderr):
+    return stdout, stderr.lower()
+
+conveyor = (
+    Conveyor()
+    .add_cmd_runner(uppercase)
+    .add_cmd_runner(lowercase_error)
+)
+
+stdout, stderr = conveyor(b"hello", b"ERROR")
+
+assert stdout == b"HELLO"
+assert stderr == b"error"
+```
+
+`Conveyor` is useful when applications need direct command-runner composition without the higher-level workflow model.
+
+## Processors and modifiers
+
+Marsh supports reusable pre/post processing around command runners.
+
+### Processors
+
+Processors perform an action without replacing the `(stdout, stderr)` values.
+
+Typical uses include:
+
+- validation;
+- logging;
+- metrics;
+- inspection.
+
+```python
+from marsh import CmdRunDecorator
+
+def validate(stdout, stderr):
+    assert not stderr.strip()
+
+def log(stdout, stderr):
+    print(stdout.decode())
+
+decorator = (
+    CmdRunDecorator()
+    .add_processor(validate, before=True)
+    .add_processor(log, before=False)
+)
+```
+
+### Modifiers
+
+Modifiers transform the command data and return a new `(stdout, stderr)` pair.
+
+```python
+def to_upper(stdout, stderr):
+    return stdout.upper(), stderr
+
+def add_prefix(stdout, stderr):
+    return b"Prefix: " + stdout, stderr
+```
+
+The evaluation order is:
+
+```mermaid
+flowchart TD
+    A[Pre-modifiers] --> B[Pre-processors]
+    B --> C[Command runner]
+    C --> D[Post-modifiers]
+    D --> E[Post-processors]
+```
+
+This distinction is important:
+
+- **Processors** observe or act on execution data.
+- **Modifiers** transform execution data.
+
+## Command execution integrations
+
+The existing library provides several execution mechanisms.
+
+### Local commands
+
+Use `BashFactory` for local shell execution:
+
+```python
+from marsh.bash import BashFactory
+
+bash = BashFactory()
+
+command = bash.create_cmd_runner(
+    'echo "Hello, $NAME"',
+    env={"NAME": "World"},
+)
+
+stdout, stderr = command(b"", b"")
+```
+
+### SSH
+
+Use `SshFactory` for SSH/Fabric-backed command execution:
+
+```python
+from marsh import Conveyor
+from marsh.ssh import SshFactory
+
+ssh = SshFactory(
+    ("user@host:port",),
+    {"connect_kwargs": {"password": "the_ssh_password"}},
+)
+
+command = ssh.create_cmd_runner("echo Hello, Remote World")
+
+conveyor = Conveyor().add_cmd_runner(command)
+
+stdout, stderr = conveyor()
+```
+
+Applications should use appropriate credential-management practices rather than embedding secrets directly in source code.
+
+### Docker
+
+Docker execution is available through the existing Docker executor APIs:
+
+```python
+from marsh.docker.docker_executor import DockerCommandExecutor
+
+executor = DockerCommandExecutor("bash:latest", ...)
+
+stdout, stderr = executor.run(
+    b"",
+    b"",
+    environment={"MODE": "test"},
+    workdir="/app",
+)
+```
+
+### Python execution
+
+Marsh also provides Python execution through `PythonExecutor`.
+
+It supports both expression evaluation and statement execution:
+
+```python
+from marsh import PythonExecutor
+
+executor = PythonExecutor(
+    "x + y",
+    mode="eval",
+    namespace={"x": 1, "y": 2},
+    use_pickle=False,
+)
+
+stdout, stderr = executor.run(b"", b"", ...)
+```
+
+These execution mechanisms remain part of Marsh's existing public API. The canonical Workflow API currently uses local process execution as its primary runtime path.
+
+## DAG workflows
+
+Marsh also provides a DAG API for dependency-based execution.
+
+The DAG package includes:
+
+- `Node`
+- `Dag`
+- `SyncDag`
+- `AsyncDag`
+- `ThreadDag`
+- `ThreadPoolDag`
+- `MultiprocessDag`
+- `ProcessPoolDag`
+
+A `Node` represents executable work, while a `Dag` represents relationships between executable objects.
+
+```python
+from marsh import Conveyor
+from marsh.dag import Node, SyncDag
+
+node_a = Node(
+    "a",
+    Conveyor().add_cmd_runner(cmd_a),
+)
+
+node_b = Node(
+    "b",
+    Conveyor().add_cmd_runner(cmd_b),
+)
+
+dag = SyncDag("example")
+dag.do(node_a).then(node_b)
+
+results = dag.start()
+```
+
+DAGs can also contain other startable objects, including nested DAGs.
+
+### Multiprocessing
+
+`MultiprocessDag` and `ProcessPoolDag` require the usual Python multiprocessing entry-point guard:
+
+```python
+if __name__ == "__main__":
+    dag.start()
+```
+
+### DAG limitation
+
+The existing DAG API currently provides dependency execution but does not provide general result/data passing between dependent tasks.
+
+Applications requiring the canonical workflow semantics should prefer `Workflow` and `Task`.
+
+## Architecture
+
+For the implemented architecture and design boundaries, see [`docs/architecture.md`](docs/architecture.md).
+
+## Current limitations
+
+The current release line intentionally has several boundaries:
+
+- The canonical runtime is local and sequential.
+- General task-to-task result/data passing is not implemented yet.
+- The canonical workflow API does not currently provide a standalone CLI.
+- YAML authoring is not currently provided.
+- Callable operations are Python-specific and are not portable JSON definitions.
+- Remote and container execution remain available through existing APIs rather than being part of the canonical local runtime.
+- The project is still Alpha.
+
+These limitations describe the current implementation; they should not be interpreted as permanent exclusions.
+
+## Development
+
+Marsh uses `uv` for dependency and environment management.
+
+Install all development and test dependencies:
+
+```bash
+uv sync --all-groups
+```
+
+Run tests:
+
+```bash
+uv run pytest -vv --disable-warnings --tb=short
+```
+
+Run linting:
+
+```bash
+uv run pflake8
+```
+
+Build the package:
+
+```bash
+uv build
+```
+
+Examples are available under [`samples/`](samples/).
+
+## Compatibility
+
+Marsh is evolving incrementally.
+
+Existing public APIs including:
+
+- `Conveyor`;
+- command runners;
+- processors and modifiers;
+- executors;
+- SSH and Docker integrations; and
+- DAG classes
+
+remain important compatibility surfaces.
+
+New functionality should prefer the canonical workflow contracts and adapt existing mechanisms into them rather than introducing a separate execution model.
+
+## Contributing
+
+Before making architectural or public-interface changes:
+
+1. Understand the existing behavior.
+2. Inspect the affected APIs and tests.
+3. Define the intended behavior.
+4. Add or update tests.
+5. Implement the smallest compatible change.
+6. Run targeted tests.
+7. Run the broader test suite.
+8. Review compatibility and documentation impact.
+
+Keep the core small, composable, dependency-light, and independent of provider-specific mechanisms wherever practical.
+
+## License
+
+Marsh is released under the MIT License. See [`LICENSE`](LICENSE).
