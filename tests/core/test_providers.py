@@ -5,6 +5,7 @@ from marsh.core.policies import FailurePolicy, ResourcePolicy, RetryPolicy, Time
 from marsh.core.providers import (
     LocalProvider,
     ProviderCapabilities,
+    Provider,
     ProviderRegistry,
     UnsupportedCapabilityError,
 )
@@ -13,6 +14,7 @@ from marsh.core.providers import (
 def test_local_provider_declares_capabilities_and_creates_machines():
     provider = LocalProvider()
     capabilities = provider.capabilities
+    assert isinstance(provider, Provider)
 
     assert isinstance(capabilities, ProviderCapabilities)
     assert "process.start" in capabilities
