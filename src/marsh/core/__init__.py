@@ -20,3 +20,5 @@ from marsh.core.serialization import (
 from marsh.core.runtime import ExecutionPlan, LocalMachine, LocalProcess, SequentialScheduler, execute_workflow, plan_workflow
 from marsh.core.policies import ExecutionPolicy, FailurePolicy, ResourcePolicy, RetryPolicy, TimeoutPolicy
 from marsh.core.providers import LocalProvider, ProviderCapabilities, ProviderRegistry, UnsupportedCapabilityError
+from marsh.core.cache import Cache, CachePolicy, MemoryCache, cache_key_for_task
+from marsh.core.observability import EventType, Observer, RuntimeEvent, emit_event

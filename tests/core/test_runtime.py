@@ -4,6 +4,8 @@ import time
 import pytest
 
 from marsh.core.domain import ProcessSpec, ProcessStatus, Result, Task, Workflow
+from marsh.core.cache import CachePolicy, MemoryCache
+from marsh.core.observability import EventType
 from marsh.core.policies import ExecutionPolicy, FailurePolicy, ResourcePolicy, RetryPolicy, TimeoutPolicy
 from marsh.core.runtime import (
     LocalMachine,
@@ -238,3 +240,51 @@ def test_local_process_exposes_explicit_lifecycle_states():
     outcome = process.wait()
     assert outcome.status is ProcessStatus.COMPLETED
     assert process.status is ProcessStatus.COMPLETED
+
+def test_execute_workflow_emits_ordered_observer_events_and_ignores_observer_errors():
+    events = []
+
+    class Observer:
+        def on_event(self, event):
+            events.append(event)
+            if event.event_type is EventType.TASK_COMPLETED:
+                raise RuntimeError("observer must not affect execution")
+
+    workflow = Workflow(
+        id="events",
+        tasks=(Task(id="task", operation=lambda *_: Result(stdout=b"ok")),),
+    )
+
+    results = execute_workflow(workflow, observers=(Observer(),))
+
+    assert results["task"].ok
+    assert [event.event_type for event in events] == [
+        EventType.WORKFLOW_STARTED,
+        EventType.TASK_STARTED,
+        EventType.TASK_COMPLETED,
+        EventType.WORKFLOW_COMPLETED,
+    ]
+    assert [event.sequence for event in events] == [1, 2, 3, 4]
+
+
+def test_execute_workflow_uses_opt_in_cache_only_for_successful_results():
+    workflow = Workflow(
+        id="cache",
+        tasks=(
+            Task(
+                id="task",
+                operation=ProcessSpec(
+                    executable=sys.executable,
+                    arguments=("-c", "print('cached')"),
+                ),
+            ),
+        ),
+    )
+    cache = MemoryCache()
+    policy = ExecutionPolicy(cache=CachePolicy(enabled=True))
+
+    first = execute_workflow(workflow, policy=policy, cache=cache)
+    second = execute_workflow(workflow, policy=policy, cache=cache)
+
+    assert first["task"] == second["task"]
+    assert first["task"].stdout.strip() == b"cached"
