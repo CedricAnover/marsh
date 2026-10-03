@@ -84,7 +84,8 @@ jobs:
           wheel.write_bytes(wheel.read_bytes() + b"intentional-recovery-test")
           PY
 
-          if python - <<'PY'
+          set +e
+          python - <<'PY'
           import hashlib
           from pathlib import Path
 
@@ -96,12 +97,14 @@ jobs:
           if hashlib.sha256(tampered.read_bytes()).hexdigest() != expected[tampered.name]:
               raise SystemExit(1)
           PY
-          then
+          verifier_status=$?
+          set -e
+
+          if [ "$verifier_status" -eq 0 ]; then
             echo "ERROR: tampered artifact was not detected"
             exit 1
-          else
-            echo "Recovery drill: tampered artifact correctly rejected"
           fi
+          echo "Recovery drill: tampered artifact correctly rejected"
 
           rm -rf recovery-test
           python - <<'PY'
