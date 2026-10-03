@@ -98,6 +98,11 @@ jobs:
             print("Python 3.12 integration environment validated; optional dependency surface is N/A.")
             PY
       - run:
+          name: Pull Docker integration test images
+          command: |
+            docker pull bash:latest
+            docker pull ubuntu:24.04
+      - run:
           name: Run Docker integration tests
           command: uv run pytest -vv --disable-warnings --tb=short tests/docker
       - run:
