@@ -28,4 +28,4 @@ class DockerCommandGrammar(CommandGrammar):
         return full_command
 
     def pipe_prev_stdout(self, x_stdout: str | bytes) -> list[str]:
-        pass
+        raise NotImplementedError
