@@ -1,39 +1,40 @@
 import time
+
 import pytest
 from testcontainers.core.container import DockerContainer
 
-# Important: Use `-s` in `uv run pytest -s tests/ssh/test_***.py` to show output.
-
-SYSBOX_IMAGE = "cedricanover94/sysbox-jammy:latest"
-RUNTIME = "sysbox-runc"
-CONN_KWARGS = {"password": "developer"}  # https://github.com/CedricAnover/Sysbox-Development-Workstation
+CONTAINER_IMAGE = "ubuntu:24.04"
+CONN_KWARGS = {"password": "developer"}
 
 
 @pytest.fixture(scope="function")
-def sysbox_container():
-    """Fixture to start and stop the Sysbox container."""
-    docker_options = {
-        "runtime": RUNTIME,
-        "tty": True,
-        "hostname": "sysbox-jammy-host",
-        "remove": True,
-    }
-
-    # Instantiate and configure the container
+def ssh_container():
+    """Start a regular Ubuntu container with OpenSSH for protocol-level tests."""
     container = (
-        DockerContainer(SYSBOX_IMAGE)
-        .with_kwargs(**docker_options)
-        .with_bind_ports(22, 2222)
+        DockerContainer(CONTAINER_IMAGE, command="sleep infinity")
+        .with_bind_ports(22)
     )
 
-    # Set environment variable and start container
     container.start()
 
-    # Allow some time for the container to initialize
-    time.sleep(2.5)
+    setup = """
+set -eux
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y --no-install-recommends openssh-server
+useradd --create-home --shell /bin/bash developer
+echo 'developer:developer' | chpasswd
+mkdir -p /run/sshd
+sed -ri 's/^#?PasswordAuthentication .*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+sed -ri 's/^#?PermitRootLogin .*/PermitRootLogin no/' /etc/ssh/sshd_config
+/usr/sbin/sshd
+"""
+    result = container.exec(["bash", "-lc", setup])
+    if result.exit_code != 0:
+        output = result.output.decode(errors="replace")
+        container.stop(force=True)
+        raise RuntimeError(f"Failed to configure OpenSSH test container: {output}")
 
-    # Provide the container to the test function
+    time.sleep(0.5)
     yield container
-
-    # Stop the container after the test
     container.stop(force=True)
