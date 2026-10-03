@@ -1,3 +1,4 @@
+from marsh.core.configuration import normalize_workflow
 from marsh.core.domain import ProcessStatus, Result
 from marsh.core.runtime import execute_workflow, plan_workflow
 from marsh.core.validation import validate_workflow_diagnostics
@@ -23,9 +24,7 @@ def test_p1_workflow_boundary_plan_execute_acceptance():
 
     assert validate_workflow_diagnostics(workflow_config) == ()
 
-    workflow = __import__("marsh.core.configuration", fromlist=["normalize_workflow"]).normalize_workflow(
-        workflow_config
-    )
+    workflow = normalize_workflow(workflow_config)
     plan = plan_workflow(workflow)
     assert plan.order == ("produce", "consume")
     assert plan.ready == ("produce",)
