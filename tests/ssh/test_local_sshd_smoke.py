@@ -11,5 +11,5 @@ def test_ssh_local_server_smoke():
     )
     stdout, stderr = connector.exec_cmd(["echo", "ssh-ok"], connection)
 
-    assert stdout == b"ssh-ok", stderr.decode()
+    assert stdout == b"ssh-ok\n", stderr.decode()
     assert stderr == b""
