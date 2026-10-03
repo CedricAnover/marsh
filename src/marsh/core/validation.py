@@ -10,7 +10,7 @@ from marsh.core.domain import Workflow
 from marsh.core.runtime import plan_workflow
 
 
-def validate_workflow(
+def validate_workflow_diagnostics(
     value: Workflow | Mapping[str, Any],
 ) -> tuple[Diagnostic, ...]:
     """Return deterministic validation diagnostics without executing work."""
@@ -22,7 +22,7 @@ def validate_workflow(
     except (TypeError, ValueError, KeyError) as exc:
         message = str(exc)
         code = "INVALID_CONFIGURATION"
-        if "unknown dependency" in message:
+        if "unknown dependencies" in message:
             code = "UNKNOWN_DEPENDENCY"
         diagnostics.append(Diagnostic(code=code, message=message))
         return tuple(diagnostics)
