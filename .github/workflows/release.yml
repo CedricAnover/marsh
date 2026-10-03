@@ -20,7 +20,7 @@ jobs:
       - name: Checkout exact release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${ github.ref }}
+          ref: ${{ github.ref }}
           fetch-depth: 1
           persist-credentials: false
 
@@ -35,7 +35,7 @@ jobs:
 
       - name: Validate release version and distribution set
         env:
-          RELEASE_VERSION: ${ github.ref_name }}
+          RELEASE_VERSION: ${{ github.ref_name }}
         run: |
           RELEASE_VERSION="\${RELEASE_VERSION#v}" python - <<'PY'
           import os
@@ -115,15 +115,15 @@ jobs:
               "pr_template": "- #{{TITLE}} ([#{{NUMBER}}](#{{URL}})) by @#{{AUTHOR}}"
             }
           fetchReleaseInformation: true
-          token: ${ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release with exact artifacts
         uses: ncipollo/release-action@v1
         with:
-          token: ${ secrets.GITHUB_TOKEN }}
-          tag: ${ github.ref_name }}
-          name: ${ github.ref_name }}
-          body: ${ steps.build_changelog.outputs.changelog }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: ${{ steps.build_changelog.outputs.changelog }}
           artifacts: "dist/*.whl,dist/*.tar.gz"
           allowUpdates: false
           draft: false
@@ -161,7 +161,7 @@ jobs:
 
       - name: Verify published artifact hashes
         env:
-          RELEASE_VERSION: ${ github.ref_name }}
+          RELEASE_VERSION: ${{ github.ref_name }}
         run: |
           RELEASE_VERSION="\${RELEASE_VERSION#v}" python - <<'PY'
           import hashlib
