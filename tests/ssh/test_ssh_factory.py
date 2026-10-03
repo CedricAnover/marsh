@@ -1,14 +1,14 @@
 import pytest
 
 from marsh.ssh import SshFactory, SshCommandGrammar, SshConnector
-from .fixtures import CONN_KWARGS
+from .fixtures import CONN_KWARGS, _connection_target, ssh_container
 
 
 @pytest.fixture
-def setup_ssh_factory():
+def setup_ssh_factory(ssh_container):
     ssh_factory = SshFactory(
         fabric_config=None,
-        connection_args=("developer@127.0.0.1:2222",),
+        connection_args=(_connection_target(ssh_container),),
         connection_kwargs=dict(connect_kwargs=CONN_KWARGS),
     )
     return ssh_factory
