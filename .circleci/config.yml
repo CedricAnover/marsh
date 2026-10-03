@@ -62,6 +62,57 @@ jobs:
           name: Build wheel
           command: uv build --wheel --out-dir dist -v
 
+  integration:
+    machine:
+      image: ubuntu-2404:current
+      docker_layer_caching: false
+    resource_class: medium
+    steps:
+      - checkout
+      - run:
+          name: Install Sysbox CE
+          command: |
+            set -euxo pipefail
+            sudo apt-get update
+            sudo apt-get install -y jq wget
+            SYSBOX_VERSION=0.7.0
+            SYSBOX_DEB=sysbox-ce_${SYSBOX_VERSION}-0.linux_amd64.deb
+            wget -q https://downloads.nestybox.com/sysbox/releases/v${SYSBOX_VERSION}/${SYSBOX_DEB}
+            echo "eeff273671467b8fa351ab3d40709759462dc03d9f7b50a1b207b37982ce40a9  ${SYSBOX_DEB}" | sha256sum -c -
+            sudo docker rm -f $(sudo docker ps -aq) || true
+            sudo apt-get install -y ./${SYSBOX_DEB}
+            sudo systemctl restart docker
+            sudo systemctl is-active --quiet docker
+            sudo docker info --format '{{json .Runtimes}}' | grep -q 'sysbox-runc'
+      - run:
+          name: Install uv
+          command: |
+            python3 -m pip install --upgrade pip
+            python3 -m pip install uv
+      - run:
+          name: Install dependencies
+          command: uv sync --all-groups
+      - run:
+          name: Validate dependency and platform contract
+          command: |
+            uv run python - <<'PY'
+            import sys
+            from pathlib import Path
+            import tomllib
+
+            assert sys.version_info[:2] == (3, 12), sys.version
+            project = tomllib.loads(Path("pyproject.toml").read_text())["project"]
+            assert "optional-dependencies" not in project, "Unexpected optional dependency surface"
+            assert project["requires-python"] == ">=3.10,<3.13"
+            print("Python 3.12 integration environment validated; optional dependency surface is N/A.")
+            PY
+      - run:
+          name: Run Docker integration tests
+          command: uv run pytest -vv --disable-warnings --tb=short tests/docker
+      - run:
+          name: Run SSH integration tests
+          command: uv run pytest -vv --disable-warnings --tb=short tests/ssh
+
 workflows:
   baseline:
     jobs:
@@ -71,3 +122,4 @@ workflows:
               python-version: ["3.10", "3.11", "3.12"]
       - lint
       - build
+      - integration
