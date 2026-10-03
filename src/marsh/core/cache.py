@@ -57,7 +57,7 @@ def cache_key_for_task(
             "namespace": namespace,
             "task_id": task.id,
             "operation": _data(task.operation),
-            "inputs": _to_data(task.inputs),
+            "inputs": _data(task.inputs),
             "resources": _to_data(task.metadata.get("resources", {})),
             "dependencies": {
                 name: {
