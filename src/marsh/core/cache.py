@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from typing import Any, Mapping, Protocol
 
 from marsh.core.domain import ProcessSpec, Result, Task
-from marsh.core.serialization import _data
 
 
 class Cache(Protocol):
