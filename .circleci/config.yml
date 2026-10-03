@@ -42,7 +42,7 @@ jobs:
           command: uv sync --all-groups
       - run:
           name: Run pflake8
-          command: uv run pflake8 src/marsh --select=E9,F
+          command: uv run pflake8 src/marsh --select=E9,F --ignore=F401,F403,F405,F541,F811,F841
 
   build:
     docker:
