@@ -21,10 +21,14 @@ jobs:
       - run:
           name: Run baseline tests
           command: |
+            mkdir -p test-results
             uv run pytest -vv --disable-warnings --tb=short \
+              --junitxml=test-results/junit.xml \
               --ignore=tests/ssh/test_ssh_connector.py \
               --ignore=tests/ssh/test_ssh_factory.py \
               --ignore=tests/docker/
+      - store_test_results:
+          path: test-results
 
   lint:
     docker:

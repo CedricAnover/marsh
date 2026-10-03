@@ -27,6 +27,12 @@ def _sequence(value: Any, field_name: str) -> tuple[Any, ...]:
     return tuple(value)
 
 
+def _identifier(value: Any, field_name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field_name} must be non-empty")
+    return value
+
+
 @dataclass(frozen=True)
 class TaskConfig:
     """Validated, syntax-neutral configuration for one task."""
@@ -45,13 +51,8 @@ class TaskConfig:
             raise ValueError("task must be a mapping")
 
         allowed = {
-            "id",
-            "operation",
-            "machine",
-            "inputs",
-            "outputs",
-            "dependencies",
-            "metadata",
+            "id", "operation", "machine", "inputs", "outputs",
+            "dependencies", "metadata",
         }
         unknown = set(value) - allowed
         if unknown:
@@ -60,8 +61,9 @@ class TaskConfig:
 
         if "id" not in value:
             raise ValueError("task id is required")
+        task_id = _identifier(value["id"], "task id")
         if "operation" not in value:
-            raise ValueError(f"task {value['id']!r} operation is required")
+            raise ValueError(f"task {task_id!r} operation is required")
 
         outputs = _sequence(value.get("outputs"), "task outputs")
         dependencies = _sequence(value.get("dependencies"), "task dependencies")
@@ -71,7 +73,7 @@ class TaskConfig:
             raise ValueError("task dependencies must contain non-empty strings")
 
         return cls(
-            id=value["id"],
+            id=task_id,
             operation=value["operation"],
             machine=value.get("machine"),
             inputs=_mapping(value.get("inputs"), "task inputs"),
@@ -114,12 +116,13 @@ class WorkflowConfig:
             raise ValueError(f"workflow has unknown fields: {names}")
         if "id" not in value:
             raise ValueError("workflow id is required")
+        workflow_id = _identifier(value["id"], "workflow id")
 
         raw_tasks = _sequence(value.get("tasks"), "workflow tasks")
         tasks = tuple(TaskConfig.from_mapping(task) for task in raw_tasks)
 
         return cls(
-            id=value["id"],
+            id=workflow_id,
             tasks=tasks,
             inputs=_mapping(value.get("inputs"), "workflow inputs"),
             outputs=_mapping(value.get("outputs"), "workflow outputs"),

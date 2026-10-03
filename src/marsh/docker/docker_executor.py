@@ -35,6 +35,7 @@ class DockerContainer:
         self._start_timeout = start_timeout
         self._timeout = timeout
         self._timer: threading.Timer | None = None
+        self._timeout_error = False
 
         self._container: Optional[Container] = None
 
@@ -76,14 +77,21 @@ class DockerContainer:
         # Clean the resources
         self._clean()
 
+        if self._timeout_error:
+            raise TimeoutError(f"Timeout reached for container '{self._name}'.")
+
         if exc_type is TimeoutError:
             return False
 
         return True
 
     def _throw_timeout_error(self) -> None:
-        self._clean()
-        raise TimeoutError(f"Timeout reached for container '{self._name}'.")
+        self._timeout_error = True
+        if self._container is not None:
+            try:
+                self._container.stop(timeout=0)
+            except NotFound:
+                pass
 
     def _clean(self) -> None:
         # 1. Cancel the Timer

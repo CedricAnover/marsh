@@ -1,0 +1,39 @@
+name: Docker Integration Smoke
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "src/marsh/docker/**"
+      - "tests/docker/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/docker-integration.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  docker-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.12"
+          enable-cache: false
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Pull integration image
+        run: docker pull bash:latest
+
+      - name: Run Docker smoke tests
+        run: |
+          uv run pytest -vv --disable-warnings --tb=short             tests/docker/test_docker_container.py::test_docker_container_resource_lifecycle             tests/docker/test_docker_command_executor.py::test_basic_command_without_piping

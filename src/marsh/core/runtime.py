@@ -9,7 +9,14 @@ from dataclasses import dataclass, replace
 from typing import Any, Mapping
 
 from marsh.core.cache import Cache, cache_key_for_task
-from marsh.core.domain import ProcessSpec, ProcessStatus, Result, Task, Workflow
+from marsh.core.domain import (
+    ProcessSpec,
+    ProcessStatus,
+    Result,
+    Task,
+    Workflow,
+    can_transition,
+)
 from marsh.core.observability import EventType, Observer, RuntimeEvent, emit_event
 from marsh.core.policies import ExecutionPolicy
 
@@ -70,11 +77,20 @@ class LocalProcess:
     def status(self) -> ProcessStatus:
         return self._status
 
+    def _transition(self, target: ProcessStatus) -> None:
+        if target is self._status:
+            return
+        if not can_transition(self._status, target):
+            raise RuntimeError(
+                f"invalid process transition: {self._status.value} -> {target.value}"
+            )
+        self._status = target
+
     def start(self) -> None:
         if self._status is not ProcessStatus.CREATED:
             raise RuntimeError(f"cannot start process in {self._status.value} state")
 
-        self._status = ProcessStatus.STARTING
+        self._transition(ProcessStatus.STARTING)
         self._started_at = time.monotonic()
         environment = os.environ.copy()
         environment.update(self.spec.environment)
@@ -89,7 +105,7 @@ class LocalProcess:
                 env=environment,
             )
         except OSError as exc:
-            self._status = ProcessStatus.FAILED
+            self._transition(ProcessStatus.FAILED)
             self._result = Result(
                 status=ProcessStatus.FAILED,
                 error=str(exc),
@@ -97,7 +113,7 @@ class LocalProcess:
             )
             return
 
-        self._status = ProcessStatus.RUNNING
+        self._transition(ProcessStatus.RUNNING)
 
     def poll(self) -> ProcessStatus:
         if self._process is None:
@@ -111,9 +127,9 @@ class LocalProcess:
             return self._status
         code = self._process.poll()
         if code is None:
-            self._status = ProcessStatus.RUNNING
+            self._transition(ProcessStatus.RUNNING)
         elif self._status is ProcessStatus.RUNNING:
-            self._status = (
+            self._transition(
                 ProcessStatus.COMPLETED if code == 0 else ProcessStatus.FAILED
             )
         return self._status
@@ -128,13 +144,17 @@ class LocalProcess:
         self._terminate(ProcessStatus.CANCELLED, force=True)
 
     def cancel(self) -> None:
+        if self._status is ProcessStatus.CREATED:
+            self._transition(ProcessStatus.CANCELLED)
+            self._result = Result(status=ProcessStatus.CANCELLED)
+            return
         self._terminate(ProcessStatus.CANCELLED)
 
     def _terminate(self, status: ProcessStatus, force: bool = False) -> None:
         if self._process is None or self._process.poll() is not None:
             return
         self._cancelled = status is ProcessStatus.CANCELLED
-        self._status = ProcessStatus.STOPPING
+        self._transition(ProcessStatus.STOPPING)
         if force:
             self._process.kill()
         else:
@@ -155,7 +175,7 @@ class LocalProcess:
                 timeout=self.spec.timeout,
             )
         except subprocess.TimeoutExpired:
-            self._status = ProcessStatus.TIMED_OUT
+            self._transition(ProcessStatus.TIMED_OUT)
             self._process.kill()
             stdout, stderr = self._process.communicate()
             return self._finish(stdout, stderr, None, ProcessStatus.TIMED_OUT, "process timed out")
@@ -182,7 +202,7 @@ class LocalProcess:
         status: ProcessStatus,
         error: str | None,
     ) -> Result:
-        self._status = status
+        self._transition(status)
         self._result = Result(
             stdout=stdout,
             stderr=stderr,
