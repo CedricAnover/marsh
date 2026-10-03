@@ -29,7 +29,7 @@ def _sequence(value: Any, field_name: str) -> tuple[Any, ...]:
 
 def _identifier(value: Any, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{field_name} must be a non-empty string")
+        raise ValueError(f"{field_name} must be non-empty")
     return value
 
 
