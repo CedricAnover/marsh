@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping, Protocol
 
 from marsh.core.domain import ProcessSpec, Result, Task
-from marsh.core.serialization import _to_data
+from marsh.core.serialization import _data
 
 
 class Cache(Protocol):
@@ -56,7 +56,7 @@ def cache_key_for_task(
         payload: dict[str, Any] = {
             "namespace": namespace,
             "task_id": task.id,
-            "operation": _to_data(task.operation),
+            "operation": _data(task.operation),
             "inputs": _to_data(task.inputs),
             "resources": _to_data(task.metadata.get("resources", {})),
             "dependencies": {
