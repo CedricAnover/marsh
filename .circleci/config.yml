@@ -80,7 +80,7 @@ jobs:
       - run:
           name: Validate dependency and platform contract
           command: |
-            uv run python - <<'PY'
+            uv run python - \<<'PY'
             import sys
             from pathlib import Path
             import tomllib
