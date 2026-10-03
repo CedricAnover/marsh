@@ -4,6 +4,7 @@ import time
 import pytest
 
 from marsh.core.domain import ProcessSpec, ProcessStatus, Result, Task, Workflow
+from marsh.core.policies import ExecutionPolicy, FailurePolicy, ResourcePolicy, RetryPolicy, TimeoutPolicy
 from marsh.core.runtime import (
     LocalMachine,
     SequentialScheduler,
@@ -184,3 +185,44 @@ def test_local_process_can_be_cancelled():
 
     assert outcome.status is ProcessStatus.CANCELLED
     assert outcome.failed is False
+
+def test_execute_workflow_applies_retry_timeout_and_resource_policies():
+    attempts = []
+
+    def operation(inputs, dependencies):
+        attempts.append(1)
+        if len(attempts) == 1:
+            return Result(status=ProcessStatus.FAILED, error="transient")
+        return Result(stdout=b"ok")
+
+    workflow = Workflow(
+        id="policy",
+        tasks=(Task(id="task", operation=operation, metadata={"resources": {"cpu": 1}}),),
+    )
+
+    results = execute_workflow(
+        workflow,
+        policy=ExecutionPolicy(
+            retry=RetryPolicy(max_attempts=2),
+            timeout=TimeoutPolicy(1.0),
+            resources=ResourcePolicy({"cpu": 2}),
+        ),
+    )
+
+    assert attempts == [1, 1]
+    assert results["task"].status is ProcessStatus.COMPLETED
+
+
+def test_execute_workflow_rejects_unsupported_task_resources():
+    workflow = Workflow(
+        id="resource",
+        tasks=(Task(id="task", operation=lambda *_: Result(), metadata={"resources": {"gpu": 1}}),),
+    )
+
+    results = execute_workflow(
+        workflow,
+        policy=ExecutionPolicy(resources=ResourcePolicy({"cpu": 2})),
+    )
+
+    assert results["task"].status is ProcessStatus.FAILED
+    assert "resources" in results["task"].error
