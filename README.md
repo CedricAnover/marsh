@@ -27,8 +27,6 @@ Marsh currently supports:
 - Python 3.11
 - Python 3.12
 
-The package declares Linux/POSIX and Windows support.
-
 The current package has runtime dependencies on:
 
 - Fabric
@@ -213,23 +211,13 @@ The current canonical runtime uses a **sequential local execution model**.
 
 Conceptually:
 
-```text
-Workflow
-   │
-   ▼
-Validation
-   │
-   ▼
-Execution Plan
-   │
-   ▼
-Sequential Scheduler
-   │
-   ▼
-Local Process Execution
-   │
-   ▼
-Structured Results
+```mermaid
+flowchart TD
+    A[Workflow] --> B[Validation]
+    B --> C[Execution Plan]
+    C --> D[Sequential Scheduler]
+    D --> E[Local Process Execution]
+    E --> F[Structured Results]
 ```
 
 The workflow model is intentionally separated from the runtime so additional scheduling and execution mechanisms can be introduced without creating another workflow engine.
@@ -262,6 +250,13 @@ workflow = Workflow(
 ```
 
 The dependency graph is validated before execution.
+
+For the example above, the dependency relationship is:
+
+```mermaid
+flowchart LR
+    build --> test
+```
 
 The current canonical scheduler executes tasks sequentially in deterministic topological order.
 
@@ -374,16 +369,12 @@ def add_prefix(stdout, stderr):
 
 The evaluation order is:
 
-```text
-Pre-modifiers
-    ↓
-Pre-processors
-    ↓
-Command runner
-    ↓
-Post-modifiers
-    ↓
-Post-processors
+```mermaid
+flowchart TD
+    A[Pre-modifiers] --> B[Pre-processors]
+    B --> C[Command runner]
+    C --> D[Post-modifiers]
+    D --> E[Post-processors]
 ```
 
 This distinction is important:
@@ -530,26 +521,14 @@ Applications requiring the canonical workflow semantics should prefer `Workflow`
 
 Marsh is moving toward a small execution kernel with explicit boundaries:
 
-```text
-UX / Python API
-       │
-       ▼
-Workflow / Task
-       │
-       ▼
-Validation
-       │
-       ▼
-Planning
-       │
-       ▼
-Scheduler
-       │
-       ▼
-Machine / Process
-       │
-       ▼
-Result
+```mermaid
+flowchart TD
+    A[UX / Python API] --> B[Workflow / Task]
+    B --> C[Validation]
+    C --> D[Planning]
+    D --> E[Scheduler]
+    E --> F[Machine / Process]
+    F --> G[Result]
 ```
 
 The architectural goal is to keep:
