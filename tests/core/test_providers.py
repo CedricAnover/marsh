@@ -1,7 +1,7 @@
 import pytest
 
 from marsh.core.domain import ProcessSpec, ProcessStatus, Result, Workflow, Task
-from marsh.core.policies import FailurePolicy, RetryPolicy, ResourcePolicy
+from marsh.core.policies import FailurePolicy, ResourcePolicy, RetryPolicy, TimeoutPolicy
 from marsh.core.providers import (
     LocalProvider,
     ProviderCapabilities,
@@ -74,3 +74,11 @@ def test_local_provider_executes_existing_process_contract():
     )
     process.start()
     assert process.wait().status is ProcessStatus.COMPLETED
+
+def test_timeout_policy_only_applies_when_no_explicit_timeout_exists():
+    policy = TimeoutPolicy(5.0)
+    assert policy.resolve(None) == 5.0
+    assert policy.resolve(2.0) == 2.0
+
+    with pytest.raises(ValueError, match="greater than zero"):
+        TimeoutPolicy(0)
