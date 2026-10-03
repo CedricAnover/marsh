@@ -57,7 +57,7 @@ jobs:
                   f"Package version {project!r} does not match tag version {version!r}"
               )
 
-          files = sorted(p.name for p in Path("dist").iterdir() if p.is_file())
+          files = sorted(p.name for p in Path("dist").iterdir() if p.is_file() and not p.name.startswith("."))
           wheels = [name for name in files if name.endswith(".whl")]
           sdists = [name for name in files if name.endswith(".tar.gz")]
 
