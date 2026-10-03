@@ -193,8 +193,9 @@ jobs:
 
           expected = {
               path.name: hashlib.sha256(path.read_bytes()).hexdigest()
-              for path in Path("dist").glob("*")
-              if path.is_file() and not path.name.endswith(".attestation")
+              for pattern in ("*.whl", "*.tar.gz")
+              for path in Path("dist").glob(pattern)
+              if path.is_file()
           }
           published = {
               item["filename"]: item["digests"]["sha256"]
@@ -202,13 +203,15 @@ jobs:
           }
 
           missing = sorted(set(expected) - set(published))
+          unexpected = sorted(set(published) - set(expected))
           mismatched = sorted(
               name for name, digest in expected.items()
               if published.get(name) != digest
           )
-          if missing or mismatched:
+          if missing or unexpected or mismatched:
               raise SystemExit(
-                  f"PyPI verification failed; missing={missing}, mismatched={mismatched}"
+                  "PyPI verification failed; "
+                  f"missing={missing}, unexpected={unexpected}, mismatched={mismatched}"
               )
-          print(f"Verified {len(expected)} published artifact hashes for marsh-lib {version}")
+          print(f"Verified {len(expected)} published distribution hashes for marsh-lib {version}")
           PY
