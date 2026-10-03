@@ -7,3 +7,4 @@ from marsh.core.script import Script
 from marsh.core.expression import *
 from marsh.core.cmd_run_decorator import *
 from marsh.core.executor import *
+from marsh.core.domain import *
