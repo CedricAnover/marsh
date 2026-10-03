@@ -56,5 +56,5 @@ def test_ssh_connector_exec_cmd(setup_ssh_connector_no_config, ssh_container):
         ["echo", "Hello", "World"],
         connection,
     )
+    assert stderr == b""
     assert stdout.decode().strip() == "Hello World"
-    assert stderr.decode().strip() == ""
