@@ -65,7 +65,7 @@ jobs:
               raise SystemExit(f"Expected exactly one wheel and one sdist, found: {files}")
 
           expected_wheel_prefix = f"marsh_lib-{version}-"
-          expected_sdist = f"marsh-lib-{version}.tar.gz"
+          expected_sdist = f"marsh_lib-{version}.tar.gz"
           if not wheels[0].startswith(expected_wheel_prefix):
               raise SystemExit(f"Unexpected wheel filename: {wheels[0]}")
           if sdists[0] != expected_sdist:
