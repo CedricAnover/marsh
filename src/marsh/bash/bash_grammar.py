@@ -6,8 +6,8 @@ class BashGrammar(CommandGrammar):
     """
     A concrete implementation of the `CommandGrammar` class for constructing and managing Bash commands.
 
-    The `BashGrammar` class simplifies building Bash command-line invocations by providing methods to 
-    add options, arguments, inline commands, or scripts. It allows users to create flexible, reusable 
+    The `BashGrammar` class simplifies building Bash command-line invocations by providing methods to
+    add options, arguments, inline commands, or scripts. It allows users to create flexible, reusable
     Bash commands programmatically and can be integrated with other tools that execute shell commands.
     """
     # /path/to/bash [options] [args]

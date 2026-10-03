@@ -3,63 +3,212 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+rc[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+[ab][0-9]+'
+
+permissions:
+  contents: read
 
 jobs:
-  release:
+  build:
+    name: Build and validate distributions
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify release tag points to main history
+        run: |
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$GITHUB_SHA" "origin/main" || {
+            echo "Release tags must point to a commit contained in main."
+            exit 1
+          }
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.12"
+          enable-cache: false
+
+      - name: Build wheel and source distribution
+        run: uv build --no-sources --out-dir dist
+
+      - name: Validate release version and distribution set
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import tomllib
+
+          version = os.environ["RELEASE_VERSION"].removeprefix("v")
+          project = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+          if project != version:
+              raise SystemExit(
+                  f"Package version {project!r} does not match tag version {version!r}"
+              )
+
+          files = sorted(p.name for p in Path("dist").iterdir() if p.is_file())
+          wheels = [name for name in files if name.endswith(".whl")]
+          sdists = [name for name in files if name.endswith(".tar.gz")]
+
+          if len(wheels) != 1 or len(sdists) != 1 or len(files) != 2:
+              raise SystemExit(f"Expected exactly one wheel and one sdist, found: {files}")
+
+          expected_wheel_prefix = f"marsh_lib-{version}-"
+          expected_sdist = f"marsh-lib-{version}.tar.gz"
+          if not wheels[0].startswith(expected_wheel_prefix):
+              raise SystemExit(f"Unexpected wheel filename: {wheels[0]}")
+          if sdists[0] != expected_sdist:
+              raise SystemExit(f"Unexpected sdist filename: {sdists[0]}")
+
+          print("\n".join(files))
+          PY
+
+      - name: Smoke test wheel
+        run: uv run --isolated --no-project --with dist/*.whl python -c "import marsh; print(marsh.__file__)"
+
+      - name: Smoke test source distribution
+        run: uv run --isolated --no-project --with dist/*.tar.gz python -c "import marsh; print(marsh.__file__)"
+
+      - name: Record artifact hashes
+        run: sha256sum dist/* | tee dist/SHA256SUMS
+
+      - name: Upload exact release distributions
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: read
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout exact release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${ github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Build Changelog
+      - name: Download exact release distributions
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist
+
+      - name: Build changelog
         id: build_changelog
-        uses: mikepenz/release-changelog-builder-action@v5
+        uses: mikepenz/release-changelog-builder-action@c9dc8369bccbc41e0ac887f8fd674f5925d315f7 # v5
         with:
           configuration: |
             {
               "categories": [
-                {
-                  "title": "## 🚀 Features",
-                  "labels": ["feature", "extension", "core", "enhancement"]
-                },
-                {
-                  "title": "## 🐛 Bug Fixes",
-                  "labels": ["bug", "bugfix", "fix"]
-                },
-                {
-                  "title": "## 🧪 Tests",
-                  "labels": ["test"]
-                },
-                {
-                  "title": "## 🛠️ Maintenance",
-                  "labels": ["documentation", "cicd"]
-                },
-                {
-                  "title": "## 🚫 Deprecated",
-                  "labels": ["deprecate"]
-                }
+                {"title": "## 🚀 Features", "labels": ["feature", "extension", "core", "enhancement"]},
+                {"title": "## 🐛 Bug Fixes", "labels": ["bug", "bugfix", "fix"]},
+                {"title": "## 🧪 Tests", "labels": ["test"]},
+                {"title": "## 🛠️ Maintenance", "labels": ["documentation", "cicd"]},
+                {"title": "## 🚫 Deprecated", "labels": ["deprecate"]}
               ],
               "ignore_labels": ["wip", "do-not-merge"],
-              "sort": {
-                "order": "ASC",
-                "on_property": "mergedAt"
-              },
+              "sort": {"order": "ASC", "on_property": "mergedAt"},
               "template": "# Release Notes for #{{TO_TAG}}\n\n#{{CHANGELOG}}\n\n<details>\n<summary>Uncategorized</summary>\n\n#{{UNCATEGORIZED}}\n</details>",
               "pr_template": "- #{{TITLE}} ([#{{NUMBER}}](#{{URL}})) by @#{{AUTHOR}}"
             }
           fetchReleaseInformation: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create Release
-        uses: ncipollo/release-action@v1
+      - name: Create GitHub Release with exact artifacts
+        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           body: ${{ steps.build_changelog.outputs.changelog }}
+          artifacts: "dist/*.whl,dist/*.tar.gz"
+          allowUpdates: false
           draft: false
+
+  publish:
+    name: Publish exact artifacts to PyPI
+    needs: release
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Install uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.12"
+          enable-cache: false
+
+      - name: Download exact release distributions
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist
+
+      - name: Generate PEP 740 attestations
+        uses: astral-sh/attest-action@f589a42a7efb6fe400b4f400de60b4bc90390027 # v0.0.6
+        with:
+          paths: |
+            dist/*.whl
+            dist/*.tar.gz
+
+      - name: Publish exact artifacts to PyPI
+        run: uv publish
+
+      - name: Verify published artifact hashes
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import urllib.request
+
+          version = os.environ["RELEASE_VERSION"].removeprefix("v")
+          url = f"https://pypi.org/pypi/marsh-lib/{version}/json"
+          with urllib.request.urlopen(url, timeout=30) as response:
+              payload = json.load(response)
+
+          expected = {
+              path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+              for path in Path("dist").glob("*")
+              if path.is_file() and not path.name.endswith(".attestation")
+          }
+          published = {
+              item["filename"]: item["digests"]["sha256"]
+              for item in payload["urls"]
+          }
+
+          missing = sorted(set(expected) - set(published))
+          mismatched = sorted(
+              name for name, digest in expected.items()
+              if published.get(name) != digest
+          )
+          if missing or mismatched:
+              raise SystemExit(
+                  f"PyPI verification failed; missing={missing}, mismatched={mismatched}"
+              )
+          print(f"Verified {len(expected)} published artifact hashes for marsh-lib {version}")
+          PY
