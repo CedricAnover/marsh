@@ -228,7 +228,7 @@ def _execute_task(
         if not policy.resources.supports(requested):
             return Result(
                 status=ProcessStatus.FAILED,
-                error=f"task ${task.id!r} requests unsupported resources: ${requested}",
+                error=f"task {task.id!r} requests unsupported resources: {requested}",
                 duration=time.monotonic() - started_at,
             )
 
@@ -270,7 +270,7 @@ def _execute_task(
 
     return Result(
         status=ProcessStatus.FAILED,
-        error=f"unsupported task operation: ${type(operation).__name__}",
+        error=f"unsupported task operation: {type(operation).__name__}",
         duration=time.monotonic() - started_at,
     )
 
@@ -298,7 +298,7 @@ def execute_workflow(
             dependency = failed_dependencies[0]
             results[task.id] = Result(
                 status=ProcessStatus.SKIPPED,
-                error=f"dependency failed: ${dependency}",
+                error=f"dependency failed: {dependency}",
             )
             continue
 
