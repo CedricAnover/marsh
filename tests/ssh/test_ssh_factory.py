@@ -14,7 +14,7 @@ def setup_ssh_factory(ssh_container):
     return ssh_factory
 
 
-def test_ssh_factory_initialization(setup_ssh_factory):
+def test_ssh_factory_initialization(setup_ssh_factory, ssh_container):
     ssh_factory = setup_ssh_factory
     assert isinstance(ssh_factory, SshFactory)
     assert ssh_factory._config is None
