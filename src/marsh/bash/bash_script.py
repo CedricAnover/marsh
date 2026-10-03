@@ -17,8 +17,8 @@ class BashScript(Script):
     """
     An implementation of the `Script` ABC for generating Bash scripts from templates.
 
-    This class provides a way to construct Bash scripts by specifying a shebang, 
-    debugging settings, and script statements. The resulting script can be rendered 
+    This class provides a way to construct Bash scripts by specifying a shebang,
+    debugging settings, and script statements. The resulting script can be rendered
     as a string using the `generate` method.
     """
     def __init__(self,
@@ -29,9 +29,9 @@ class BashScript(Script):
         Initializes a `BashScript` instance with a default shebang and debugging options.
 
         Args:
-            `shebang` (str): The shebang line to specify the shell for the script. 
+            `shebang` (str): The shebang line to specify the shell for the script.
                            Defaults to `#!/usr/bin/env bash`.
-            `debugging` (str): Debugging options to set shell behavior. Defaults to 
+            `debugging` (str): Debugging options to set shell behavior. Defaults to
                              `set -eu -o pipefail`.
 
         Raises:
@@ -54,7 +54,7 @@ class BashScript(Script):
                  sep: str = "\n"
                  ) -> str:
         """
-        Renders the Bash script by substituting the provided script statements 
+        Renders the Bash script by substituting the provided script statements
         into the template.
 
         Args:

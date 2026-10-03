@@ -17,7 +17,7 @@ class Executor(ABC):
     """
     Abstract base class for command execution.
 
-    This class defines a common interface for running commands, where subclasses implement 
+    This class defines a common interface for running commands, where subclasses implement
     the `run` method to execute commands in specific environments (e.g., local, remote).
     """
 
