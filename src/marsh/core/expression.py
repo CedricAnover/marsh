@@ -97,7 +97,7 @@ class OrExpression(CommandExpression):
 class JunctionExpression(CommandExpression):
     """
     (command1 > command2) > (command3 > command4)
-    
+
     It may look similar to `command1 & command2` but this does not necessarily raise error if there was an error on left-side.
     """
     left: CommandExpression | Conveyor
