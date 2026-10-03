@@ -60,10 +60,9 @@ def test_docker_container_resource_cleanup_on_error(mocker):
 def test_docker_container_timeout_handling():
     timeout = 2
     container_name = "test-container"
-    with DockerContainer("bash:latest", name=container_name, timeout=timeout) as container:
-        with pytest.raises(TimeoutError, match=f"Timeout reached for container '{container_name}'."):
-            # Sleep longer than the timeout to trigger the timeout handling
-            # time.sleep(timeout + 1.5)
+    with pytest.raises(TimeoutError, match=f"Timeout reached for container '{container_name}'."):
+        with DockerContainer("bash:latest", name=container_name, timeout=timeout) as container:
+            # Sleep longer than the timeout to trigger the timeout handling.
             container.exec_run(["bash", "-c", f"sleep {timeout + 1.5}"])
 
     stdout, stderr = _get_container_from_filter(container_name)

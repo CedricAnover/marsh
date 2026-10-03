@@ -123,12 +123,8 @@ def test_timeout_handling():
         timeout=timeout
     )
 
-    # The current timeout implementation uses a background timer to clean up
-    # the container; Python does not propagate an exception raised by that
-    # timer into the command-running thread.
-    stdout, stderr = command_executor.run(b"", b"", f"sleep {test_timeout}")
-    assert stdout == b""
-    assert stderr == b""
+    with pytest.raises(TimeoutError, match="Timeout reached for container"):
+        command_executor.run(b"", b"", f"sleep {test_timeout}")
 
 
 def test_non_existent_docker_image():

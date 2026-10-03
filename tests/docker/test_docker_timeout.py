@@ -1,3 +1,5 @@
+import pytest
+
 from marsh.docker.docker_executor import DockerContainer
 
 
@@ -48,9 +50,10 @@ def test_docker_timeout_is_propagated_to_context_caller(monkeypatch):
         start_timeout=0,
     )
 
-    with container as fake:
-        assert fake is client.containers.container
-        container._throw_timeout_error()
+    with pytest.raises(TimeoutError, match="Timeout reached for container 'test-container'."):
+        with container as fake:
+            assert fake is client.containers.container
+            container._throw_timeout_error()
 
     assert client.closed
     assert fake.stopped
