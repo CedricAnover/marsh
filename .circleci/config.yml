@@ -38,6 +38,9 @@ jobs:
             python -m pip install --upgrade pip
             python -m pip install uv
       - run:
+          name: Install dependencies
+          command: uv sync --all-groups
+      - run:
           name: Run pflake8
           command: uv run pflake8 src/marsh --select=E9,F --ignore=F401,F403,F405,F541,F811,F841
 
@@ -52,6 +55,9 @@ jobs:
           command: |
             python -m pip install --upgrade pip
             python -m pip install uv
+      - run:
+          name: Install dependencies
+          command: uv sync --all-groups
       - run:
           name: Build wheel
           command: uv build --wheel --out-dir dist -v
