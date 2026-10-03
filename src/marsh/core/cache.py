@@ -55,7 +55,19 @@ def cache_key_for_task(
         payload: dict[str, Any] = {
             "namespace": namespace,
             "task_id": task.id,
-            "operation": {\n                "executable": task.operation.executable,\n                "arguments": list(task.operation.arguments),\n                "environment": dict(sorted(task.operation.environment.items())),\n                "working_directory": task.operation.working_directory,\n                "stdin": task.operation.stdin.hex() if task.operation.stdin is not None else None,\n                "timeout": task.operation.timeout,\n                "machine": task.operation.machine,\n                "resources": dict(sorted(task.operation.resources.items())),\n                "metadata": task.operation.metadata,\n            },
+            "operation": {
+                "executable": task.operation.executable,
+                "arguments": list(task.operation.arguments),
+                "environment": dict(sorted(task.operation.environment.items())),
+                "working_directory": task.operation.working_directory,
+                "stdin": task.operation.stdin.hex()
+                if task.operation.stdin is not None
+                else None,
+                "timeout": task.operation.timeout,
+                "machine": task.operation.machine,
+                "resources": dict(sorted(task.operation.resources.items())),
+                "metadata": task.operation.metadata,
+            },
             "inputs": task.inputs,
             "resources": task.metadata.get("resources", {}),
             "dependencies": {
@@ -69,7 +81,11 @@ def cache_key_for_task(
                 for name, result in sorted(dependency_results.items())
             },
         }
-        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        encoded = json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
     except (TypeError, ValueError):
         return None
     return hashlib.sha256(encoded).hexdigest()
