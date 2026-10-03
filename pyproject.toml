@@ -76,5 +76,5 @@ include = ["src/**/*.py"]
 [tool.black]
 line-length = 88
 target-version = ['py310', 'py311', 'py312', 'py313']
-include = '\\.pyi?$'
+include = '\.pyi?$'
 #extend-exclude = '...'
