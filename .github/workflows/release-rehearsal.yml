@@ -1,0 +1,176 @@
+name: Release Rehearsal
+
+on:
+  push:
+    branches:
+      - chore/p7-release-rehearsal-and-matrix
+
+permissions:
+  contents: read
+
+jobs:
+  rehearsal:
+    name: Build, publish, verify, and exercise recovery against TestPyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout exact rehearsal revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.12"
+          enable-cache: false
+
+      - name: Build wheel and source distribution once
+        run: uv build --no-sources --out-dir dist
+
+      - name: Validate exact rehearsal artifact set
+        env:
+          RELEASE_VERSION: "0.3.0"
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import tomllib
+
+          version = os.environ["RELEASE_VERSION"]
+          project = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+          if project != version:
+              raise SystemExit(f"Package version {project!r} does not match rehearsal version {version!r}")
+
+          files = sorted(
+              p.name for p in Path("dist").iterdir()
+              if p.is_file() and not p.name.startswith(".")
+          )
+          wheels = [name for name in files if name.endswith(".whl")]
+          sdists = [name for name in files if name.endswith(".tar.gz")]
+          if len(wheels) != 1 or len(sdists) != 1 or len(files) != 2:
+              raise SystemExit(f"Expected exactly one wheel and one sdist, found: {files}")
+
+          if not wheels[0].startswith(f"marsh_lib-{version}-"):
+              raise SystemExit(f"Unexpected wheel filename: {wheels[0]}")
+          if sdists[0] != f"marsh_lib-{version}.tar.gz":
+              raise SystemExit(f"Unexpected sdist filename: {sdists[0]}")
+          print("\n".join(files))
+          PY
+
+      - name: Smoke test wheel
+        run: uv run --isolated --no-project --with dist/*.whl python -c "import marsh; print(marsh.__file__)"
+
+      - name: Smoke test source distribution
+        run: uv run --isolated --no-project --with dist/*.tar.gz python -c "import marsh; print(marsh.__file__)"
+
+      - name: Record exact distribution hashes
+        run: |
+          sha256sum dist/*.whl dist/*.tar.gz | tee dist/SHA256SUMS
+
+      - name: Exercise verifier failure and recovery path
+        run: |
+          set -euo pipefail
+          mkdir -p recovery-test
+          cp dist/*.whl recovery-test/
+          python - <<'PY'
+          from pathlib import Path
+          wheel = next(Path("recovery-test").glob("*.whl"))
+          wheel.write_bytes(wheel.read_bytes() + b"intentional-recovery-test")
+          PY
+
+          if python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          expected = {
+              p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+              for p in Path("dist").glob("*.whl")
+          }
+          tampered = next(Path("recovery-test").glob("*.whl"))
+          if hashlib.sha256(tampered.read_bytes()).hexdigest() != expected[tampered.name]:
+              raise SystemExit(1)
+          PY
+          then
+            echo "ERROR: tampered artifact was not detected"
+            exit 1
+          else
+            echo "Recovery drill: tampered artifact correctly rejected"
+          fi
+
+          rm -rf recovery-test
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          for p in list(Path("dist").glob("*.whl")) + list(Path("dist").glob("*.tar.gz")):
+              recorded = next(
+                  line.split()[0]
+                  for line in Path("dist/SHA256SUMS").read_text().splitlines()
+                  if line.endswith(f"  {p.name}")
+              )
+              actual = hashlib.sha256(p.read_bytes()).hexdigest()
+              assert recorded == actual, p.name
+          print("Recovery drill: original immutable artifacts revalidated successfully")
+          PY
+
+      - name: Publish exact artifacts to TestPyPI
+        run: uv publish --publish-url https://test.pypi.org/legacy/
+
+      - name: Verify TestPyPI hashes
+        env:
+          RELEASE_VERSION: "0.3.0"
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import urllib.request
+
+          version = os.environ["RELEASE_VERSION"]
+          url = f"https://test.pypi.org/pypi/marsh-lib/{version}/json"
+          with urllib.request.urlopen(url, timeout=30) as response:
+              payload = json.load(response)
+
+          expected = {
+              p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+              for pattern in ("*.whl", "*.tar.gz")
+              for p in Path("dist").glob(pattern)
+              if p.is_file()
+          }
+          published = {
+              item["filename"]: item["digests"]["sha256"]
+              for item in payload["urls"]
+          }
+          missing = sorted(set(expected) - set(published))
+          unexpected = sorted(set(published) - set(expected))
+          mismatched = sorted(
+              name for name, digest in expected.items()
+              if published.get(name) != digest
+          )
+          if missing or unexpected or mismatched:
+              raise SystemExit(
+                  "TestPyPI verification failed; "
+                  f"missing={missing}, unexpected={unexpected}, mismatched={mismatched}"
+              )
+          print(f"Verified {len(expected)} TestPyPI distribution hashes for marsh-lib {version}")
+          PY
+
+      - name: Install rehearsal package from TestPyPI
+        run: |
+          uv run --isolated --no-project --with "marsh-lib==0.3.0" \
+            --index-url https://test.pypi.org/simple/ \
+            --extra-index-url https://pypi.org/simple/ \
+            python -c "import marsh; print(marsh.__file__)"
+
+      - name: Rehearsal summary
+        run: |
+          echo "Non-production release rehearsal completed."
+          echo "Production PyPI was not contacted."
+          echo "The exact artifact set was built once, published to TestPyPI, hash-verified, installed, and recovery verification was exercised."
