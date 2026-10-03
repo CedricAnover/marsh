@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from marsh.core.domain import ProcessStatus, Result
+from marsh.core.cache import CachePolicy
 
 
 @dataclass(frozen=True)
@@ -85,3 +86,4 @@ class ExecutionPolicy:
     timeout: TimeoutPolicy | None = None
     resources: ResourcePolicy | None = None
     failure: FailurePolicy = FailurePolicy()
+    cache: CachePolicy = CachePolicy()
