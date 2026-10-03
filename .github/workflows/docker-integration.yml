@@ -31,6 +31,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-groups
 
+      - name: Pull integration image
+        run: docker pull bash:latest
+
       - name: Run Docker smoke tests
         run: |
           uv run pytest -vv --disable-warnings --tb=short             tests/docker/test_docker_container.py::test_docker_container_resource_lifecycle             tests/docker/test_docker_command_executor.py::test_basic_command_without_piping
