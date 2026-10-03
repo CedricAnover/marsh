@@ -37,17 +37,14 @@ jobs:
           sudo apt-get install -y openssh-server
           sudo useradd --create-home --shell /bin/bash marsh-ci
           sudo install -d -m 700 -o marsh-ci -g marsh-ci /home/marsh-ci/.ssh
-          ssh-keygen -q -t ed25519 -N "" -f "$RUNNER_TEMP/marsh_ci_key"
-          sudo cp "$RUNNER_TEMP/marsh_ci_key.pub" /home/marsh-ci/.ssh/authorized_keys
-          sudo chown marsh-ci:marsh-ci /home/marsh-ci/.ssh/authorized_keys
-          sudo chmod 600 /home/marsh-ci/.ssh/authorized_keys
+          echo "marsh-ci:marsh-password" | sudo chpasswd
           sudo mkdir -p /run/sshd
           cat > "$RUNNER_TEMP/sshd_config" <<EOF
           Port 2222
           ListenAddress 127.0.0.1
           HostKey /etc/ssh/ssh_host_ed25519_key
           PubkeyAuthentication yes
-          PasswordAuthentication no
+          PasswordAuthentication yes
           PermitRootLogin no
           UsePAM no
           PidFile $RUNNER_TEMP/sshd.pid
@@ -58,5 +55,5 @@ jobs:
       - name: Run SSH smoke test
         env:
           MARSH_SSH_TARGET: marsh-ci@127.0.0.1:2222
-          MARSH_SSH_KEY: ${{ runner.temp }}/marsh_ci_key
+          MARSH_SSH_PASSWORD: marsh-password
         run: uv run pytest -vv --disable-warnings --tb=short tests/ssh/test_local_sshd_smoke.py
