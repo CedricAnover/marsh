@@ -8,7 +8,9 @@ import time
 from dataclasses import dataclass, replace
 from typing import Any, Mapping
 
+from marsh.core.cache import Cache, cache_key_for_task
 from marsh.core.domain import ProcessSpec, ProcessStatus, Result, Task, Workflow
+from marsh.core.observability import EventType, Observer, RuntimeEvent, emit_event
 from marsh.core.policies import ExecutionPolicy
 
 
@@ -219,9 +221,22 @@ def _execute_task(
     machine: LocalMachine,
     dependency_results: Mapping[str, Result],
     policy: ExecutionPolicy,
+    cache: Cache | None = None,
 ) -> Result:
     operation = task.operation
     started_at = time.monotonic()
+
+    cache_key = None
+    if policy.cache.enabled and cache is not None:
+        cache_key = cache_key_for_task(
+            task,
+            dependency_results,
+            namespace=policy.cache.namespace,
+        )
+        if cache_key is not None:
+            cached = cache.get(cache_key)
+            if cached is not None and cached.ok:
+                return cached
 
     if policy.resources is not None:
         requested = task.metadata.get("resources", {})
@@ -280,12 +295,31 @@ def execute_workflow(
     machine: LocalMachine | None = None,
     scheduler: SequentialScheduler | None = None,
     policy: ExecutionPolicy | None = None,
+    observers: tuple[Observer, ...] = (),
+    cache: Cache | None = None,
 ) -> dict[str, Result]:
     """Execute a workflow sequentially with explicit, composable policies."""
     machine = machine or LocalMachine()
     scheduler = scheduler or SequentialScheduler()
     policy = policy or ExecutionPolicy()
     results: dict[str, Result] = {}
+    sequence = 0
+
+    def notify(event_type: EventType, task_id: str | None = None, result: Result | None = None) -> None:
+        nonlocal sequence
+        sequence += 1
+        event = RuntimeEvent(
+            sequence=sequence,
+            event_type=event_type,
+            workflow_id=workflow.id,
+            task_id=task_id,
+            status=result.status if result is not None else None,
+            metadata={"duration": result.duration} if result is not None else {},
+        )
+        for observer in observers:
+            emit_event(observer, event)
+
+    notify(EventType.WORKFLOW_STARTED)
 
     for task in scheduler.schedule(workflow):
         failed_dependencies = [
@@ -294,12 +328,14 @@ def execute_workflow(
             if results[dependency].failed
             or results[dependency].status is not ProcessStatus.COMPLETED
         ]
+        notify(EventType.TASK_STARTED, task.id)
         if failed_dependencies:
             dependency = failed_dependencies[0]
             results[task.id] = Result(
                 status=ProcessStatus.SKIPPED,
                 error=f"dependency failed: {dependency}",
             )
+            notify(EventType.TASK_SKIPPED, task.id, results[task.id])
             continue
 
         result = _execute_task(
@@ -307,10 +343,25 @@ def execute_workflow(
             machine,
             {dependency: results[dependency] for dependency in task.dependencies},
             policy,
+            cache,
         )
         results[task.id] = result
+        notify(
+            EventType.TASK_FAILED if result.failed else EventType.TASK_COMPLETED,
+            task.id,
+            result,
+        )
+        if policy.cache.enabled and cache is not None and result.ok:
+            cache_key = cache_key_for_task(
+                task,
+                {dependency: results[dependency] for dependency in task.dependencies},
+                namespace=policy.cache.namespace,
+            )
+            if cache_key is not None:
+                cache.put(cache_key, result)
 
         if result.failed and not policy.failure.should_continue(result):
             break
 
+    notify(EventType.WORKFLOW_COMPLETED)
     return results
