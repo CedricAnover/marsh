@@ -19,7 +19,7 @@ def test_ssh_factory_initialization(setup_ssh_factory):
     assert isinstance(ssh_factory, SshFactory)
     assert ssh_factory._config is None
     assert isinstance(ssh_factory._conn_args, tuple)
-    assert ssh_factory._conn_args[0] == "developer@127.0.0.1:2222"
+    assert ssh_factory._conn_args[0] == _connection_target(ssh_container)
     assert isinstance(ssh_factory._conn_kwargs, dict)
     assert ssh_factory._conn_kwargs["connect_kwargs"] == {"password": "developer"}
 
