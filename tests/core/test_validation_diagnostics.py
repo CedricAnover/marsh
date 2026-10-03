@@ -16,26 +16,44 @@ def test_workflow_config_rejects_blank_task_id():
         )
 
 
-def test_validate_workflow_reports_duplicate_outputs_and_unknown_dependencies():
+def test_validate_workflow_reports_duplicate_outputs():
+    from marsh.core.validation import validate_workflow_diagnostics
+
+    workflow = Workflow(
+        id="wf",
+        tasks=(
+            Task(id="a", operation=lambda i, d: None, outputs=("x",)),
+            Task(id="b", operation=lambda i, d: None, outputs=("x",)),
+        ),
+    )
+
+    diagnostics = validate_workflow_diagnostics(workflow)
+
+    assert [(item.code, item.task_id) for item in diagnostics] == [
+        ("DUPLICATE_OUTPUT", "b")
+    ]
+
+
+def test_validate_workflow_reports_unknown_dependencies():
     from marsh.core.validation import validate_workflow_diagnostics
 
     diagnostics = validate_workflow_diagnostics(
         {
             "id": "wf",
             "tasks": [
-                {"id": "a", "operation": lambda i, d: None, "outputs": ["x"]},
+                {"id": "a", "operation": lambda i, d: None},
                 {
                     "id": "b",
                     "operation": lambda i, d: None,
-                    "outputs": ["x"],
                     "dependencies": ["missing"],
                 },
             ],
         }
     )
 
-    assert [item.code for item in diagnostics] == ["DUPLICATE_OUTPUT", "UNKNOWN_DEPENDENCY"]
-    assert all(item.severity == "error" for item in diagnostics)
+    assert [(item.code, item.message) for item in diagnostics] == [
+        ("UNKNOWN_DEPENDENCY", "task 'b' has unknown dependencies: missing")
+    ]
 
 
 def test_validate_workflow_reports_cycles_deterministically():
