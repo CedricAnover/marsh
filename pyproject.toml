@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "marsh-lib"
-version = "0.3.0"
+version = "0.3.1"
 description = "Lightweight, extensible Python library for building, managing, and executing command workflows."
 authors = [{ name = "Cedric Anover", email = "cedric.anover@hotmail.com" }]
 license = { text = "MIT" }
@@ -20,8 +20,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Shells",
-    "Topic :: System :: System Shells",
-    "Topic :: System :: Systems Administration",
+    "Topic :: System :: System Administration",
     "Topic :: Utilities",
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
