@@ -1,0 +1,73 @@
+version: 2.1
+
+jobs:
+  test:
+    parameters:
+      python-version:
+        type: string
+    docker:
+      - image: cimg/python:<< parameters.python-version >>
+    resource_class: medium
+    steps:
+      - checkout
+      - run:
+          name: Install uv
+          command: |
+            python -m pip install --upgrade pip
+            python -m pip install uv
+      - run:
+          name: Install dependencies
+          command: uv sync --all-groups
+      - run:
+          name: Run baseline tests
+          command: |
+            uv run pytest -vv --disable-warnings --tb=short \
+              --ignore=tests/ssh/test_ssh_connector.py \
+              --ignore=tests/ssh/test_ssh_factory.py \
+              --ignore=tests/docker/
+
+  lint:
+    docker:
+      - image: cimg/python:3.10
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Install uv
+          command: |
+            python -m pip install --upgrade pip
+            python -m pip install uv
+      - run:
+          name: Install dependencies
+          command: uv sync --all-groups
+      - run:
+          name: Run pflake8
+          command: uv run pflake8
+
+  build:
+    docker:
+      - image: cimg/python:3.10
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Install uv
+          command: |
+            python -m pip install --upgrade pip
+            python -m pip install uv
+      - run:
+          name: Install dependencies
+          command: uv sync --all-groups
+      - run:
+          name: Build wheel
+          command: uv build --wheel --out-dir dist -v
+
+workflows:
+  baseline:
+    jobs:
+      - test:
+          matrix:
+            parameters:
+              python-version: ["3.10", "3.11", "3.12"]
+      - lint
+      - build
