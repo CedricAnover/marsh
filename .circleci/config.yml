@@ -28,18 +28,39 @@ jobs:
               --ignore=tests/ssh/test_ssh_factory.py \
               --ignore=tests/docker/
 
-  docker-integration:
+  docker-integration-lifecycle:
     docker:
-      - image: cimg/base:current
+      - image: cimg/python:3.12
     resource_class: medium
     steps:
+      - checkout
       - setup_remote_docker:
           docker_layer_caching: false
       - run:
-          name: Verify Docker integration environment
+          name: Install uv
           command: |
-            docker version
-            docker run --rm hello-world
+            python -m pip install --upgrade pip
+            python -m pip install uv
+      - run:
+          name: Docker lifecycle integration
+          command: uv sync --all-groups && uv run pytest -vv --disable-warnings --tb=short tests/docker/test_docker_container.py::test_docker_container_resource_lifecycle
+
+  docker-integration-command:
+    docker:
+      - image: cimg/python:3.12
+    resource_class: medium
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: false
+      - run:
+          name: Install uv
+          command: |
+            python -m pip install --upgrade pip
+            python -m pip install uv
+      - run:
+          name: Docker command integration
+          command: uv sync --all-groups && uv run pytest -vv --disable-warnings --tb=short tests/docker/test_docker_command_executor.py::test_basic_command_without_piping
 
   lint:
     docker:
@@ -85,5 +106,7 @@ workflows:
             parameters:
               python-version: ["3.10", "3.11", "3.12"]
       - lint
+      - docker-integration-lifecycle
+      - docker-integration-command
       - docker-integration
       - build
