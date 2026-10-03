@@ -75,3 +75,13 @@ class ResourcePolicy:
             elif value != available:
                 return False
         return True
+
+
+@dataclass(frozen=True)
+class ExecutionPolicy:
+    """Composable policy bundle applied by the workflow runtime."""
+
+    retry: RetryPolicy = RetryPolicy()
+    timeout: TimeoutPolicy | None = None
+    resources: ResourcePolicy | None = None
+    failure: FailurePolicy = FailurePolicy()
