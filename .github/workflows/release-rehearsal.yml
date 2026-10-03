@@ -115,7 +115,7 @@ jobs:
               recorded = next(
                   line.split()[0]
                   for line in Path("dist/SHA256SUMS").read_text().splitlines()
-                  if line.endswith(f"  {p.name}")
+                  if Path(line.split(maxsplit=1)[1]).name == p.name
               )
               actual = hashlib.sha256(p.read_bytes()).hexdigest()
               assert recorded == actual, p.name
