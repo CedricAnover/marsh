@@ -5,10 +5,11 @@ from __future__ import annotations
 import os
 import subprocess
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Mapping
 
 from marsh.core.domain import ProcessSpec, ProcessStatus, Result, Task, Workflow
+from marsh.core.policies import ExecutionPolicy
 
 
 @dataclass(frozen=True)
@@ -217,35 +218,59 @@ def _execute_task(
     task: Task,
     machine: LocalMachine,
     dependency_results: Mapping[str, Result],
+    policy: ExecutionPolicy,
 ) -> Result:
     operation = task.operation
     started_at = time.monotonic()
 
+    if policy.resources is not None:
+        requested = task.metadata.get("resources", {})
+        if not policy.resources.supports(requested):
+            return Result(
+                status=ProcessStatus.FAILED,
+                error=f"task \${task.id!r} requests unsupported resources: \${requested}",
+                duration=time.monotonic() - started_at,
+            )
+
     if isinstance(operation, ProcessSpec):
-        process = machine.create_process(operation)
-        process.start()
-        return process.wait()
+        if policy.timeout is not None:
+            operation = replace(
+                operation,
+                timeout=policy.timeout.resolve(operation.timeout),
+            )
+        attempts = 0
+        while True:
+            attempts += 1
+            process = machine.create_process(operation)
+            process.start()
+            result = process.wait()
+            if not policy.retry.should_retry(result, attempts):
+                return result
 
     if callable(operation):
-        try:
-            result = operation(task.inputs, dependency_results)
-        except Exception as exc:
-            return Result(
-                status=ProcessStatus.FAILED,
-                error=str(exc),
-                duration=time.monotonic() - started_at,
-            )
-        if not isinstance(result, Result):
-            return Result(
-                status=ProcessStatus.FAILED,
-                error="task operation must return a Result",
-                duration=time.monotonic() - started_at,
-            )
-        return result
+        attempts = 0
+        while True:
+            attempts += 1
+            try:
+                result = operation(task.inputs, dependency_results)
+            except Exception as exc:
+                result = Result(
+                    status=ProcessStatus.FAILED,
+                    error=str(exc),
+                    duration=time.monotonic() - started_at,
+                )
+            if not isinstance(result, Result):
+                result = Result(
+                    status=ProcessStatus.FAILED,
+                    error="task operation must return a Result",
+                    duration=time.monotonic() - started_at,
+                )
+            if not policy.retry.should_retry(result, attempts):
+                return result
 
     return Result(
         status=ProcessStatus.FAILED,
-        error=f"unsupported task operation: {type(operation).__name__}",
+        error=f"unsupported task operation: \${type(operation).__name__}",
         duration=time.monotonic() - started_at,
     )
 
@@ -254,30 +279,38 @@ def execute_workflow(
     workflow: Workflow,
     machine: LocalMachine | None = None,
     scheduler: SequentialScheduler | None = None,
+    policy: ExecutionPolicy | None = None,
 ) -> dict[str, Result]:
-    """Execute a workflow sequentially and propagate dependency failures."""
+    """Execute a workflow sequentially with explicit, composable policies."""
     machine = machine or LocalMachine()
     scheduler = scheduler or SequentialScheduler()
+    policy = policy or ExecutionPolicy()
     results: dict[str, Result] = {}
 
     for task in scheduler.schedule(workflow):
         failed_dependencies = [
             dependency
             for dependency in task.dependencies
-            if results[dependency].failed or results[dependency].status is not ProcessStatus.COMPLETED
+            if results[dependency].failed
+            or results[dependency].status is not ProcessStatus.COMPLETED
         ]
         if failed_dependencies:
             dependency = failed_dependencies[0]
             results[task.id] = Result(
                 status=ProcessStatus.SKIPPED,
-                error=f"dependency failed: {dependency}",
+                error=f"dependency failed: \${dependency}",
             )
             continue
 
-        results[task.id] = _execute_task(
+        result = _execute_task(
             task,
             machine,
             {dependency: results[dependency] for dependency in task.dependencies},
+            policy,
         )
+        results[task.id] = result
+
+        if result.failed and not policy.failure.should_continue(result):
+            break
 
     return results
