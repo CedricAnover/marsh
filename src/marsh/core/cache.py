@@ -55,9 +55,9 @@ def cache_key_for_task(
         payload: dict[str, Any] = {
             "namespace": namespace,
             "task_id": task.id,
-            "operation": _data(task.operation),
-            "inputs": _data(task.inputs),
-            "resources": _to_data(task.metadata.get("resources", {})),
+            "operation": {\n                "executable": task.operation.executable,\n                "arguments": list(task.operation.arguments),\n                "environment": dict(sorted(task.operation.environment.items())),\n                "working_directory": task.operation.working_directory,\n                "stdin": task.operation.stdin.hex() if task.operation.stdin is not None else None,\n                "timeout": task.operation.timeout,\n                "machine": task.operation.machine,\n                "resources": dict(sorted(task.operation.resources.items())),\n                "metadata": task.operation.metadata,\n            },
+            "inputs": task.inputs,
+            "resources": task.metadata.get("resources", {}),
             "dependencies": {
                 name: {
                     "stdout": result.stdout.hex(),
