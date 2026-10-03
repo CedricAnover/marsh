@@ -56,4 +56,4 @@ jobs:
         env:
           MARSH_SSH_TARGET: marsh-ci@127.0.0.1:2222
           MARSH_SSH_PASSWORD: marsh-password
-        run: uv run pytest -vv --disable-warnings --tb=short tests/ssh/test_local_sshd_smoke.py
+        run: uv run pytest -s -vv --disable-warnings --tb=short tests/ssh/test_local_sshd_smoke.py
