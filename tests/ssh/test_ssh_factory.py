@@ -1,7 +1,7 @@
 import pytest
 
 from marsh.ssh import SshFactory, SshCommandGrammar, SshConnector
-from .fixtures import CONN_KWARGS, ssh_container
+from .fixtures import CONN_KWARGS
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ def test_ssh_factory_create_connector(setup_ssh_factory):
     assert isinstance(connector, SshConnector)
 
 
-def test_ssh_factory_create_cmd_runner(ssh_container, setup_ssh_factory):
+def test_ssh_factory_create_cmd_runner(setup_ssh_factory):
     ssh_factory = setup_ssh_factory
     cmd_runner = ssh_factory.create_cmd_runner(["echo Hello World"])
     stdout, stderr = cmd_runner(b"", b"")
@@ -45,7 +45,7 @@ def test_ssh_factory_create_cmd_runner(ssh_container, setup_ssh_factory):
     assert stderr.decode().strip() == ""
 
 
-def test_ssh_factory_create_cmd_runner_with_invalid_command(ssh_container, setup_ssh_factory):
+def test_ssh_factory_create_cmd_runner_with_invalid_command(setup_ssh_factory):
     ssh_factory = setup_ssh_factory
     cmd_runner = ssh_factory.create_cmd_runner(["cho Hello World"])
     stdout, stderr = cmd_runner(b"", b"")
@@ -54,7 +54,7 @@ def test_ssh_factory_create_cmd_runner_with_invalid_command(ssh_container, setup
     assert stderr.decode().strip() != ""
 
 
-def test_ssh_factory_create_chained_cmd_runner(ssh_container, setup_ssh_factory):
+def test_ssh_factory_create_chained_cmd_runner(setup_ssh_factory):
     ssh_factory = setup_ssh_factory
     cmd_runner = ssh_factory.create_chained_cmd_runner(["echo Hello", "echo World"])
     stdout, stderr = cmd_runner(b"", b"")
