@@ -268,13 +268,18 @@ def test_execute_workflow_emits_ordered_observer_events_and_ignores_observer_err
 
 
 def test_execute_workflow_uses_opt_in_cache_only_for_successful_results():
-    calls = []
-
-    def operation(inputs, dependencies):
-        calls.append(1)
-        return Result(stdout=b"cached")
-
-    workflow = Workflow(id="cache", tasks=(Task(id="task", operation=operation),))
+    workflow = Workflow(
+        id="cache",
+        tasks=(
+            Task(
+                id="task",
+                operation=ProcessSpec(
+                    executable=sys.executable,
+                    arguments=("-c", "print('cached')"),
+                ),
+            ),
+        ),
+    )
     cache = MemoryCache()
     policy = ExecutionPolicy(cache=CachePolicy(enabled=True))
 
@@ -282,4 +287,4 @@ def test_execute_workflow_uses_opt_in_cache_only_for_successful_results():
     second = execute_workflow(workflow, policy=policy, cache=cache)
 
     assert first["task"] == second["task"]
-    assert calls == [1]
+    assert first["task"].stdout.strip() == b"cached"
