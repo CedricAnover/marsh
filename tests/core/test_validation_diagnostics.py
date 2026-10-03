@@ -6,29 +6,20 @@ from marsh.core.domain import Task, Workflow
 
 def test_workflow_config_rejects_unknown_fields():
     with pytest.raises(ValueError, match="unknown fields: mystery"):
-        WorkflowConfig.from_mapping(
-            {
-                "id": "wf",
-                "tasks": [],
-                "mystery": True,
-            }
-        )
+        WorkflowConfig.from_mapping({"id": "wf", "tasks": [], "mystery": True})
 
 
 def test_workflow_config_rejects_blank_task_id():
     with pytest.raises(ValueError, match="task id must be non-empty"):
         WorkflowConfig.from_mapping(
-            {
-                "id": "wf",
-                "tasks": [{"id": " ", "operation": lambda i, d: None}],
-            }
+            {"id": "wf", "tasks": [{"id": " ", "operation": lambda i, d: None}]}
         )
 
 
 def test_validate_workflow_reports_duplicate_outputs_and_unknown_dependencies():
-    from marsh.core.validation import validate_workflow
+    from marsh.core.validation import validate_workflow_diagnostics
 
-    diagnostics = validate_workflow(
+    diagnostics = validate_workflow_diagnostics(
         {
             "id": "wf",
             "tasks": [
@@ -43,15 +34,12 @@ def test_validate_workflow_reports_duplicate_outputs_and_unknown_dependencies():
         }
     )
 
-    assert [item.code for item in diagnostics] == [
-        "DUPLICATE_OUTPUT",
-        "UNKNOWN_DEPENDENCY",
-    ]
+    assert [item.code for item in diagnostics] == ["DUPLICATE_OUTPUT", "UNKNOWN_DEPENDENCY"]
     assert all(item.severity == "error" for item in diagnostics)
 
 
 def test_validate_workflow_reports_cycles_deterministically():
-    from marsh.core.validation import validate_workflow
+    from marsh.core.validation import validate_workflow_diagnostics
 
     workflow = Workflow(
         id="wf",
@@ -61,7 +49,7 @@ def test_validate_workflow_reports_cycles_deterministically():
         ),
     )
 
-    diagnostics = validate_workflow(workflow)
+    diagnostics = validate_workflow_diagnostics(workflow)
 
     assert [(item.code, item.message) for item in diagnostics] == [
         ("DEPENDENCY_CYCLE", "workflow contains a dependency cycle")
