@@ -37,12 +37,12 @@ jobs:
         env:
           RELEASE_VERSION: ${{ github.ref_name }}
         run: |
-          RELEASE_VERSION="\${RELEASE_VERSION#v}" python - <<'PY'
+          python - <<'PY'
           import os
           from pathlib import Path
           import tomllib
 
-          version = os.environ["RELEASE_VERSION"]
+          version = os.environ["RELEASE_VERSION"].removeprefix("v")
           project = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
           if project != version:
               raise SystemExit(
@@ -163,14 +163,14 @@ jobs:
         env:
           RELEASE_VERSION: ${{ github.ref_name }}
         run: |
-          RELEASE_VERSION="\${RELEASE_VERSION#v}" python - <<'PY'
+          python - <<'PY'
           import hashlib
           import json
           import os
           from pathlib import Path
           import urllib.request
 
-          version = os.environ["RELEASE_VERSION"]
+          version = os.environ["RELEASE_VERSION"].removeprefix("v")
           url = f"https://pypi.org/pypi/marsh-lib/{version}/json"
           with urllib.request.urlopen(url, timeout=30) as response:
               payload = json.load(response)
