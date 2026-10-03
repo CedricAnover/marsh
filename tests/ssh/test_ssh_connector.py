@@ -4,18 +4,13 @@ import fabric
 import pytest
 
 from marsh.ssh import SshConnector
-from .fixtures import CONN_KWARGS, ssh_container
+from .fixtures import CONN_KWARGS, _connection_target, ssh_container
 
 
 @pytest.fixture
 def setup_ssh_connector_no_config():
     return SshConnector()
 
-
-def _connection_target(container):
-    host = container.get_container_host_ip()
-    port = container.get_exposed_port(22)
-    return f"developer@{host}:{port}"
 
 
 def test_ssh_connector_initialization_without_fabric_config(setup_ssh_connector_no_config):
@@ -56,5 +51,5 @@ def test_ssh_connector_exec_cmd(setup_ssh_connector_no_config, ssh_container):
         ["echo", "Hello", "World"],
         connection,
     )
+    assert stderr == b""
     assert stdout.decode().strip() == "Hello World"
-    assert stderr.decode().strip() == ""

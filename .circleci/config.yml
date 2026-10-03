@@ -72,15 +72,21 @@ jobs:
       - run:
           name: Install uv
           command: |
+            set -euxo pipefail
             python3 -m pip install --upgrade pip
-            python3 -m pip install uv
+            python3 -m pip install --user uv==0.12.12
+            USER_BIN="$(python3 -m site --user-base)/bin"
+            echo "export PATH=\"$USER_BIN:\$PATH\"" >> "$BASH_ENV"
+            export PATH="$USER_BIN:$PATH"
+            "$USER_BIN/uv" --version
+            command -v uv
       - run:
           name: Install dependencies
           command: uv sync --all-groups
       - run:
           name: Validate dependency and platform contract
           command: |
-            uv run python - <<'PY'
+            uv run python - \<<'PY'
             import sys
             from pathlib import Path
             import tomllib
@@ -91,6 +97,11 @@ jobs:
             assert project["requires-python"] == ">=3.10,<3.13"
             print("Python 3.12 integration environment validated; optional dependency surface is N/A.")
             PY
+      - run:
+          name: Pull Docker integration test images
+          command: |
+            docker pull bash:latest
+            docker pull ubuntu:24.04
       - run:
           name: Run Docker integration tests
           command: uv run pytest -vv --disable-warnings --tb=short tests/docker

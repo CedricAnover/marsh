@@ -7,6 +7,12 @@ CONTAINER_IMAGE = "ubuntu:24.04"
 CONN_KWARGS = {"password": "developer"}
 
 
+def _connection_target(container):
+    host = container.get_container_host_ip()
+    port = container.get_exposed_port(22)
+    return f"developer@{host}:{port}"
+
+
 @pytest.fixture(scope="function")
 def ssh_container():
     """Start a regular Ubuntu container with OpenSSH for protocol-level tests."""

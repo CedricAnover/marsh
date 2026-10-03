@@ -62,7 +62,7 @@ class SshConnector(Connector):
         result = None
         try:
             command = " ".join(command)
-            result = connection.run(command, hide=True, **run_kwargs)
+            result = connection.run(command, hide=True, in_stream=False, **run_kwargs)
             return result.stdout.encode(encoding), result.stderr.encode(encoding)
         except Exception as e:
             return b"", str(e).encode(encoding)
