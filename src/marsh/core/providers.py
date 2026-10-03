@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Mapping, Protocol
+from typing import Iterable, Mapping, Protocol, runtime_checkable
 
 from marsh.core.domain import Machine, ProcessSpec
 from marsh.core.runtime import LocalMachine
@@ -35,6 +35,7 @@ class ProviderCapabilities:
         return set(required).issubset(self.values)
 
 
+@runtime_checkable
 class Provider(Protocol):
     """Mechanism boundary for materializing execution machines."""
 
@@ -91,6 +92,14 @@ class ProviderRegistry:
 
     def get(self, name: str) -> Provider | None:
         return self._providers.get(name)
+
+    def find(self, capabilities: Iterable[str] = ()) -> tuple[tuple[str, Provider], ...]:
+        required = frozenset(capabilities)
+        return tuple(
+            (name, self._providers[name])
+            for name in sorted(self._providers)
+            if self._providers[name].capabilities.satisfies(required)
+        )
 
     def require(self, name: str, capabilities: Iterable[str] = ()) -> Provider:
         provider = self._providers.get(name)
