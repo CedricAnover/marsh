@@ -9,7 +9,7 @@ def case_conversion(inp_stdout: bytes,
     if output_stream == "stdout":
         return inp_stdout.upper() if upper else inp_stdout.lower(), inp_stderr
     else:
-        return inp_stderr.upper() if upper else inp_stderr.lower(), inp_stderr
+        return inp_stdout, inp_stderr.upper() if upper else inp_stderr.lower()
 
 
 __all__ = (
