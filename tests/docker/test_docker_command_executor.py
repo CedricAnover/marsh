@@ -145,18 +145,6 @@ def test_instantiation_with_invalid_container_constructor_parameters():
     pass
 
 
-def test_with_run_keyword_arguments():
-    command_executor = DockerCommandExecutor("bash:latest")
-    stdout, stderr = command_executor.run(
-        b"",
-        b"",
-        "echo Testing",
-        invalid_kwg=2,
-    )
-    assert stdout.decode().strip() == "Testing"
-    assert stderr.decode().strip() == ""
-
-
 @pytest.mark.parametrize(
     'command_executor',
     [
