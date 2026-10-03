@@ -226,3 +226,15 @@ def test_execute_workflow_rejects_unsupported_task_resources():
 
     assert results["task"].status is ProcessStatus.FAILED
     assert "resources" in results["task"].error
+
+def test_local_process_exposes_explicit_lifecycle_states():
+    spec = ProcessSpec(executable=sys.executable, arguments=("-c", "print('ok')"))
+    process = LocalMachine().create_process(spec)
+
+    assert process.status is ProcessStatus.CREATED
+    process.start()
+    assert process.status is ProcessStatus.RUNNING
+    assert process.poll() in {ProcessStatus.RUNNING, ProcessStatus.COMPLETED}
+    outcome = process.wait()
+    assert outcome.status is ProcessStatus.COMPLETED
+    assert process.status is ProcessStatus.COMPLETED
