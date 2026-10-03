@@ -9,6 +9,20 @@ from marsh.core.domain import ProcessStatus, Result
 
 
 @dataclass(frozen=True)
+class TimeoutPolicy:
+    """Provides a default timeout without overriding an explicit task timeout."""
+
+    timeout: float
+
+    def __post_init__(self) -> None:
+        if self.timeout <= 0:
+            raise ValueError("timeout must be greater than zero")
+
+    def resolve(self, explicit: float | None) -> float:
+        return explicit if explicit is not None else self.timeout
+
+
+@dataclass(frozen=True)
 class RetryPolicy:
     """Controls whether a failed attempt may be retried."""
 
