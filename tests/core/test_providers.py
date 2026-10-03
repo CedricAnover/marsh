@@ -28,6 +28,7 @@ def test_provider_registry_discovers_and_negotiates_capabilities():
     assert registry.get("local") is not None
     selected = registry.require("local", {"process.start", "process.wait"})
     assert selected is registry.get("local")
+    assert registry.find({"process.wait"}) == (("local", selected),)
 
     with pytest.raises(UnsupportedCapabilityError):
         registry.require("local", {"process.stream"})
