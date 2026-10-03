@@ -75,9 +75,11 @@ jobs:
             set -euxo pipefail
             python3 -m pip install --upgrade pip
             python3 -m pip install --user uv==0.12.12
-            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASH_ENV"
-            export PATH="$HOME/.local/bin:$PATH"
-            uv --version
+            USER_BIN="$(python3 -m site --user-base)/bin"
+            echo "export PATH=\"$USER_BIN:\$PATH\"" >> "$BASH_ENV"
+            export PATH="$USER_BIN:$PATH"
+            "$USER_BIN/uv" --version
+            command -v uv
       - run:
           name: Install dependencies
           command: uv sync --all-groups
