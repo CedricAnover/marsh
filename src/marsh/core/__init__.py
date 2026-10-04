@@ -17,7 +17,7 @@ from marsh.core.serialization import (
     workflow_to_json,
 )
 
-from marsh.core.runtime import ExecutionPlan, LocalMachine, LocalProcess, SequentialScheduler, execute_workflow, plan_workflow
+from marsh.core.runtime import ExecutionPlan, LocalMachine, LocalProcess, SequentialScheduler, execute_workflow, execute_workflow_async, plan_workflow
 from marsh.core.policies import ExecutionPolicy, FailurePolicy, ResourcePolicy, RetryPolicy, TimeoutPolicy
 from marsh.core.providers import (
     LocalProvider,
@@ -32,3 +32,4 @@ from marsh.core.providers import (
 )
 from marsh.core.cache import Cache, CachePolicy, MemoryCache, cache_key_for_task
 from marsh.core.observability import EventType, Observer, RuntimeEvent, emit_event
+from marsh.core.scheduler import AsyncScheduler, ConcurrentScheduler, ExecutorScheduler, ProcessScheduler, SchedulerState, TaskState, ThreadScheduler
