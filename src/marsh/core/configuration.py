@@ -213,6 +213,7 @@ class WorkflowConfig:
             inputs=self.inputs,
             outputs=self.outputs,
             metadata=self.metadata,
+            policy=self.policy.values,
         )
 
 
