@@ -67,6 +67,7 @@ RunTask = Callable[[Task, Mapping[str, Result]], Result]
 AsyncRunTask = Callable[[Task, Mapping[str, Result]], Awaitable[Result] | Result]
 OnStart = Callable[[str], None]
 OnComplete = Callable[[str, Result], None]
+OnBlocked = Callable[[str, Result], None]
 
 
 class ConcurrentScheduler:
@@ -110,10 +111,13 @@ class ConcurrentScheduler:
             dependency = state.dependency_failed(task)
             if dependency is not None:
                 state.states[task.id] = TaskState.BLOCKED
-                state.results[task.id] = Result(
-                    status=__import__("marsh.core.domain", fromlist=["ProcessStatus"]).ProcessStatus.SKIPPED,
+                result = Result(
+                    status=ProcessStatus.SKIPPED,
                     error=f"dependency failed: {dependency}",
                 )
+                state.results[task.id] = result
+                if on_blocked is not None:
+                    on_blocked(task.id, result)
                 changed = True
         return changed
 
@@ -123,6 +127,7 @@ class ConcurrentScheduler:
         state: SchedulerState,
         running: int,
         on_start: OnStart | None,
+        on_blocked: OnBlocked | None,
     ) -> list[Task]:
         self._block_unrunnable(workflow, state)
         if self._cancel_requested:
@@ -150,6 +155,7 @@ class AsyncScheduler(ConcurrentScheduler):
         *,
         on_start: OnStart | None = None,
         on_complete: OnComplete | None = None,
+        on_blocked: OnBlocked | None = None,
         fail_fast: bool = False,
     ) -> dict[str, Result]:
         self.reset()
@@ -157,7 +163,7 @@ class AsyncScheduler(ConcurrentScheduler):
         running: dict[asyncio.Task[Result], str] = {}
 
         while not all(state.terminal(task.id) for task in workflow.tasks):
-            for task in self._prepare_dispatch(workflow, state, len(running), on_start):
+            for task in self._prepare_dispatch(workflow, state, len(running), on_start, on_blocked):
                 dependencies = {d: state.results[d] for d in task.dependencies}
                 future = asyncio.create_task(run_task(task, dependencies))
                 running[future] = task.id
