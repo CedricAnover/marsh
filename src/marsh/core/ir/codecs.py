@@ -112,6 +112,7 @@ def document_from_workflow(workflow: Workflow) -> WorkflowDocument:
         "inputs": _encode(workflow.inputs, "$.workflow.inputs"),
         "outputs": _encode(workflow.outputs, "$.workflow.outputs"),
         "metadata": _encode(workflow.metadata, "$.workflow.metadata"),
+        "policy": _encode(workflow.policy, "$.workflow.policy"),
     }
     return WorkflowDocument(
         schema={"name": IR_NAME, "version": IR_VERSION},
@@ -145,6 +146,7 @@ def document_to_workflow(document: WorkflowDocument) -> Workflow:
             inputs=_decode(data.get("inputs", {}), "$.workflow.inputs"),
             outputs=_decode(data.get("outputs", {}), "$.workflow.outputs"),
             metadata=_decode(data.get("metadata", {}), "$.workflow.metadata"),
+            policy=_decode(data.get("policy", {}), "$.workflow.policy"),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise SerializationError("invalid marsh.workflow/v1 document") from exc
