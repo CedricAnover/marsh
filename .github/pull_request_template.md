@@ -1,3 +1,6 @@
+## Summary
+[1–3 concise, user-facing bullets describing what changed and why. This section is used in release notes.]
+
 ## Description
 [Brief and concise description of the changes]
 
@@ -17,7 +20,6 @@
 - [ ] Related API documentation, if any, has been updated.
 - [ ] My code is self-documented with clear comments for complex areas.
 - [ ] Public methods and classes include appropriate docstrings.
-- [ ] Function names, variables, and class names are descriptive and adhere to naming conventions.
 - [ ] I understand that pull requests will not be merged if they do not pass the automated tests.
 - [ ] New functionality is covered by automated tests.
 - [ ] Code changes have been tested across relevant environments or configurations.
