@@ -125,3 +125,116 @@ def test_docker_provider_executes_real_container():
     assert result.status is ProcessStatus.COMPLETED
     assert result.exit_code == 0
     assert result.stdout.strip() == b"docker-ok"
+
+
+
+def test_provider_specific_dependencies_are_optional_extras():
+    import tomllib
+    from pathlib import Path
+
+    project = tomllib.loads(Path("pyproject.toml").read_text())["project"]
+    dependencies = set(project["dependencies"])
+    extras = project["optional-dependencies"]
+
+    assert not any(dependency.startswith("docker") for dependency in dependencies)
+    assert not any(dependency.startswith("fabric") for dependency in dependencies)
+    assert any(dependency.startswith("docker") for dependency in extras["docker"])
+    assert any(dependency.startswith("fabric") for dependency in extras["ssh"])
+
+
+def test_importing_core_does_not_eagerly_require_fabric():
+    import subprocess
+
+    code = """
+import builtins
+real_import = builtins.__import__
+
+def guarded_import(name, *args, **kwargs):
+    if name == "fabric" or name.startswith("fabric."):
+        raise ModuleNotFoundError("fabric intentionally unavailable")
+    return real_import(name, *args, **kwargs)
+
+builtins.__import__ = guarded_import
+import marsh
+assert marsh.Workflow
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_docker_provider_config_options_materialize_machine():
+    from marsh.providers.docker_provider import DockerMachine, DockerProvider
+
+    machine = DockerProvider(image="python:3.12-slim").create_machine(
+        image="ubuntu:24.04",
+        client_kwargs={"timeout": 5},
+    )
+
+    assert isinstance(machine, DockerMachine)
+    assert machine.config.image == "ubuntu:24.04"
+    assert machine.config.client_kwargs == {"timeout": 5}
+
+
+def test_docker_wait_normalizes_read_timeout_to_timed_out_result():
+    from requests.exceptions import ReadTimeout
+    from marsh.providers.docker_provider import DockerProcess, DockerProviderConfig
+
+    class FakeContainer:
+        def wait(self, timeout):
+            raise ReadTimeout("docker wait timed out")
+
+        def remove(self, force=True):
+            return None
+
+    process = DockerProcess(
+        ProcessSpec(executable="python"),
+        DockerProviderConfig("python:3.12-slim"),
+    )
+    process._container = FakeContainer()
+
+    result = process.wait()
+
+    assert result.status is ProcessStatus.TIMED_OUT
+    assert result.error == "process timed out"
+    assert process.status is ProcessStatus.TIMED_OUT
+
+
+def test_docker_stop_normalizes_provider_failure():
+    from marsh.providers.docker_provider import DockerProcess, DockerProviderConfig, ProviderError
+
+    class FakeContainer:
+        def stop(self, timeout=0):
+            raise RuntimeError("stop failed")
+
+        def remove(self, force=True):
+            return None
+
+    process = DockerProcess(
+        ProcessSpec(executable="python"),
+        DockerProviderConfig("python:3.12-slim"),
+    )
+    process._container = FakeContainer()
+    process._status = ProcessStatus.RUNNING
+
+    with pytest.raises(ProviderError, match="stop failed"):
+        process.stop()
+
+    assert process.status is ProcessStatus.RUNNING
+
+
+def test_provider_configuration_is_not_logged_by_default(caplog):
+    from marsh.providers.docker_provider import DockerProvider
+
+    secret = "super-secret-provider-value"
+    with caplog.at_level("DEBUG"):
+        DockerProvider(
+            image="python:3.12-slim",
+            client_kwargs={"password": secret},
+        )
+
+    assert secret not in caplog.text
