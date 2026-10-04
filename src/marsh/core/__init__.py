@@ -43,3 +43,7 @@ from marsh.core.providers import (
 from marsh.core.cache import Cache, CachePolicy, MemoryCache, cache_key_for_task
 from marsh.core.observability import EventType, Observer, RuntimeEvent, emit_event
 from marsh.core.scheduler import AsyncScheduler, ConcurrentScheduler, ExecutorScheduler, ProcessScheduler, SchedulerState, TaskState, ThreadScheduler
+
+from marsh.core.artifacts import Artifact, ArtifactRef, ArtifactStore, Provenance
+from marsh.core.artifact_store import LocalArtifactStore
+from marsh.core.identity import canonical_bytes, content_digest, execution_id
