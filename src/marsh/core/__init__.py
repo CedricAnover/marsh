@@ -13,8 +13,18 @@ from marsh.core.serialization import (
     validate_workflow,
     workflow_from_dict,
     workflow_from_json,
+    workflow_to_document,
     workflow_to_dict,
     workflow_to_json,
+)
+from marsh.core.ir import (
+    IR_VERSION,
+    OperationRef,
+    WorkflowDocument,
+    WorkflowIR,
+    OperationResolutionError,
+    SerializationError,
+    UnsupportedSchemaVersionError,
 )
 
 from marsh.core.runtime import ExecutionPlan, LocalMachine, LocalProcess, SequentialScheduler, execute_workflow, execute_workflow_async, plan_workflow
