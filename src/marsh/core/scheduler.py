@@ -250,7 +250,7 @@ class ExecutorScheduler(ConcurrentScheduler):
 
         with self.executor_type(max_workers=self.max_concurrency) as executor:
             while not all(state.terminal(task.id) for task in workflow.tasks):
-                for task in self._prepare_dispatch(workflow, state, len(running), on_start):
+                for task in self._prepare_dispatch(workflow, state, len(running), on_start, on_blocked):
                     dependencies = {d: state.results[d] for d in task.dependencies}
                     running[executor.submit(run_task, task, dependencies)] = task.id
 
@@ -344,6 +344,7 @@ class ProcessScheduler(ExecutorScheduler):
             run_task,
             on_start=on_start,
             on_complete=on_complete,
+            on_blocked=on_blocked,
             fail_fast=fail_fast,
         )
 
