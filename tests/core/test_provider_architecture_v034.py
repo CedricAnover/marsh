@@ -116,8 +116,8 @@ def test_docker_provider_implements_the_same_capability_contract():
 def test_docker_provider_executes_real_container():
     from marsh.providers.docker_provider import DockerProvider
 
-    process = DockerProvider(image="python:3.12-slim").create_machine().create_process(
-        ProcessSpec(executable="python", arguments=("-c", "print('docker-ok')"))
+    process = DockerProvider(image="bash:latest").create_machine().create_process(
+        ProcessSpec(executable="bash", arguments=("-lc", "printf docker-ok"))
     )
     process.start()
     result = process.wait()
