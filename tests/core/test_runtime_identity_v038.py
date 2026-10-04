@@ -69,7 +69,7 @@ def test_cache_hit_reuses_execution_identity_without_creating_attempt():
     second = execute_workflow(workflow, policy=policy, cache=cache)["task"]
 
     assert first.execution_id == second.execution_id
-    assert second.attempt_id is None
+    assert second.attempt_id == first.attempt_id
 
 
 def test_artifact_reference_can_be_verified_from_provenance(tmp_path):
