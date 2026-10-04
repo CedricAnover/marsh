@@ -14,7 +14,7 @@ def redirect_output_stream(inp_stdout: bytes,
     if output_stream not in ["stdout", "stderr"]:
         raise ValueError("Output stream must be 'stdout' or 'stderr'.")
 
-    with open(file_path, mode) as file:
+    with open(file_path, mode, encoding=encoding) as file:
         if output_stream == "stdout":
             file.write(inp_stdout.decode(encoding).strip())
         else:
