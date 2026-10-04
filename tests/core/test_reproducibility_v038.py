@@ -79,3 +79,24 @@ assert store.get(ref) == b"cross-process artifact"
             ref.media_type,
         ]
     )
+
+
+def test_artifact_store_recovers_when_windows_replace_reports_access_denied_after_deduplication(tmp_path, monkeypatch):
+    store = LocalArtifactStore(tmp_path)
+    original_replace = __import__("marsh.core.artifact_store", fromlist=["os"]).os.replace
+    destination_created = False
+
+    def replace_with_windows_collision(temp_name, destination):
+        nonlocal destination_created
+        if not destination_created and str(temp_name).startswith(str(store.tmp / "artifact-")):
+            destination.write_bytes(__import__("pathlib").Path(temp_name).read_bytes())
+            destination_created = True
+            raise PermissionError(5, "Access is denied")
+        return original_replace(temp_name, destination)
+
+    monkeypatch.setattr("marsh.core.artifact_store.os.replace", replace_with_windows_collision)
+
+    ref = store.put(b"windows deduplication")
+
+    assert store.verify(ref)
+    assert store.object_count() == 1
