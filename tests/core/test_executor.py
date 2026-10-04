@@ -71,12 +71,23 @@ def test_empty_command(local_executor, mocker):
         local_executor.run(b"", b"")
 
 
-def test_timeout(local_executor, mocker, monkeypatch):
-    mocker.patch.object(local_executor.command_grammar, 'build_cmd', return_value=["bash", "-c", "sleep 5"])
-    local_executor.timeout = 1  # Set the timeout class field to 1
+def test_timeout(local_executor, mocker):
+    mocker.patch.object(
+        local_executor.command_grammar,
+        "build_cmd",
+        return_value=["deterministic-command"],
+    )
+    mock_popen = mocker.patch("subprocess.Popen", autospec=True)
+    mock_popen.return_value.communicate.side_effect = subprocess.TimeoutExpired(
+        cmd=["deterministic-command"],
+        timeout=1,
+    )
+    local_executor.timeout = 1
 
     with pytest.raises(subprocess.TimeoutExpired):
-        local_executor.run(b"", b"")  # Setting a short timeout
+        local_executor.run(b"", b"")
+
+    mock_popen.return_value.communicate.assert_called_once_with(timeout=1)
 
 
 def test_pipe_prev_stdout(local_executor, mocker):
@@ -92,15 +103,27 @@ def test_pipe_prev_stdout(local_executor, mocker):
 
 
 def test_callback_function(local_executor, mocker):
-    mocker.patch.object(local_executor.command_grammar, 'build_cmd', return_value=["echo", "test"])
+    mocker.patch.object(
+        local_executor.command_grammar,
+        "build_cmd",
+        return_value=["deterministic-command"],
+    )
+    mock_popen = mocker.patch("subprocess.Popen", autospec=True)
+    process = mock_popen.return_value
 
     def custom_callback(process, stdout, stderr, *args, **kwargs):
-        # Modify the output from the subprocess
         return b"modified-stdout", b"modified-stderr"
 
     stdout, stderr = local_executor.run(b"", b"", callback=custom_callback)
+
     assert stdout == b"modified-stdout"
     assert stderr == b"modified-stderr"
+    mock_popen.assert_called_once_with(
+        ["deterministic-command"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
 
 
 def test_large_command(local_executor, mocker):
@@ -127,12 +150,17 @@ def test_empty_output(local_executor, mocker):
 
 
 def test_invalid_callback_return(local_executor, mocker):
-    mocker.patch.object(local_executor.command_grammar, 'build_cmd', return_value=["bash", "-c", "echo TEST"])
+    mocker.patch.object(
+        local_executor.command_grammar,
+        "build_cmd",
+        return_value=["deterministic-command"],
+    )
+    mocker.patch("subprocess.Popen", autospec=True)
 
     def invalid_callback(process, stdout, stderr, *args, **kwargs):
-        pass  # Incorrect return type
+        pass
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"Given callback must return tuple\[bytes, bytes\]"):
         local_executor.run(b"", b"", callback=invalid_callback)
 
 
