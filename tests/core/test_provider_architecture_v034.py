@@ -135,7 +135,7 @@ def test_provider_specific_dependencies_are_optional_extras():
         import tomli as tomllib
     from pathlib import Path
 
-    project = tomllib.loads(Path("pyproject.toml").read_text())["project"]
+    project = tomllib.loads(Path(__file__).resolve().parents[2].joinpath("pyproject.toml").read_text())["project"]
     dependencies = set(project["dependencies"])
     extras = project["optional-dependencies"]
 
@@ -199,6 +199,7 @@ def test_docker_wait_normalizes_read_timeout_to_timed_out_result():
         DockerProviderConfig("python:3.12-slim"),
     )
     process._container = FakeContainer()
+    process._status = ProcessStatus.RUNNING
 
     result = process.wait()
 
