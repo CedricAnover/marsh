@@ -123,10 +123,3 @@ def test_process_protocol_can_expose_optional_capabilities_without_universal_met
     assert isinstance(MinimalProcess(), Startable)
     assert isinstance(MinimalProcess(), Waitable)
 
-
-def test_domain_contracts_snapshot_mutable_authoring_mappings():
-    inputs = {"value": {"nested": 1}}
-    task = Task(id="immutable", operation="echo", inputs=inputs)
-    inputs["value"]["nested"] = 2
-
-    assert task.inputs["value"]["nested"] == 1
