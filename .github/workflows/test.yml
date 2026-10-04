@@ -38,11 +38,6 @@ jobs:
             --ignore=../tests/docker/ \
             ../tests/
 
-      - name: Docker provider smoke
-        env:
-          CIRCLE_JOB: integration
-        run: uv run pytest -q tests/core/test_provider_architecture_v034.py::test_docker_provider_executes_real_container
-
       - name: Get Coverage
         if: ${{ github.event_name == 'pull_request' }}
         uses: orgoro/coverage@v3.2
