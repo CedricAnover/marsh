@@ -2,21 +2,29 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from marsh.core.domain import Workflow
-from marsh.core.ir.errors import SerializationError
-from marsh.core.serialization import workflow_to_json
+if TYPE_CHECKING:
+    from marsh.core.domain import Workflow
 
 
 def canonical_bytes(value: Any) -> bytes:
+    if TYPE_CHECKING:
+        pass
+    from marsh.core.domain import Workflow
+    from marsh.core.ir.errors import SerializationError
+    from marsh.core.serialization import workflow_to_json
+
     if isinstance(value, Workflow):
         try:
             return workflow_to_json(value).encode("utf-8")
         except SerializationError as exc:
             if "non-finite" in str(exc):
                 raise ValueError(str(exc)) from exc
-            raise TypeError(f"unsupported identity value: {type(exc).__name__}") from exc
+            raise TypeError(
+                f"unsupported identity value: {type(exc).__name__}"
+            ) from exc
+
     try:
         encoded = json.dumps(
             value,
@@ -44,6 +52,8 @@ def execution_id(
     semantic_inputs: Any = None,
     policy: Any = None,
 ) -> str:
+    from marsh.core.serialization import workflow_to_json
+
     payload: dict[str, Any] = {
         "schema": "marsh.execution/v1",
         "workflow": json.loads(workflow_to_json(workflow)),
