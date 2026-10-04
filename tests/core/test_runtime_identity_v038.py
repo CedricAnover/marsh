@@ -11,21 +11,27 @@ def emit_payload(inputs, dependencies):
     return Result(stdout=b"payload")
 
 
-def test_retry_keeps_execution_identity_but_changes_attempt_identity(tmp_path):
-    calls = []
+_retry_calls = 0
 
-    def operation(inputs, dependencies):
-        calls.append(1)
-        if len(calls) == 1:
-            return Result(
-                status=ProcessStatus.FAILED,
-                metadata={"failure_class": "transient"},
-            )
-        return Result(stdout=b"ok")
+
+def retry_operation(inputs, dependencies):
+    global _retry_calls
+    _retry_calls += 1
+    if _retry_calls == 1:
+        return Result(
+            status=ProcessStatus.FAILED,
+            metadata={"failure_class": "transient"},
+        )
+    return Result(stdout=b"ok")
+
+
+def test_retry_keeps_execution_identity_but_changes_attempt_identity(tmp_path):
+    global _retry_calls
+    _retry_calls = 0
 
     workflow = Workflow(
         id="identity",
-        tasks=(Task(id="task", operation=operation),),
+        tasks=(Task(id="task", operation=retry_operation),),
     )
 
     result = execute_workflow(
