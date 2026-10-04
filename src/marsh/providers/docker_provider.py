@@ -130,6 +130,16 @@ class DockerProcess:
             )
             return self._result
         except Exception as exc:
+            from requests.exceptions import ReadTimeout
+
+            if isinstance(exc, ReadTimeout):
+                self._transition(ProcessStatus.TIMED_OUT)
+                self._result = Result(
+                    status=ProcessStatus.TIMED_OUT,
+                    error="process timed out",
+                )
+                return self._result
+        except Exception as exc:
             if self._status is ProcessStatus.RUNNING:
                 self._transition(ProcessStatus.FAILED)
             self._result = Result(status=ProcessStatus.FAILED, error=str(exc))
@@ -151,22 +161,32 @@ class DockerProcess:
 
     def stop(self) -> None:
         if self._container is not None and self._status is ProcessStatus.RUNNING:
-            self._transition(ProcessStatus.STOPPING)
-            self._container.stop(timeout=0)
-            self._transition(ProcessStatus.CANCELLED)
-            self._result = Result(status=ProcessStatus.CANCELLED)
-            self._cleanup()
+            try:
+                self._transition(ProcessStatus.STOPPING)
+                self._container.stop(timeout=0)
+                self._transition(ProcessStatus.CANCELLED)
+                self._result = Result(status=ProcessStatus.CANCELLED)
+                self._cleanup()
+            except Exception as exc:
+                if self._status is ProcessStatus.STOPPING:
+                    self._status = ProcessStatus.RUNNING
+                raise ProviderError(str(exc)) from exc
 
     def terminate(self) -> None:
         self.stop()
 
     def kill(self) -> None:
         if self._container is not None and self._status is ProcessStatus.RUNNING:
-            self._transition(ProcessStatus.STOPPING)
-            self._container.kill()
-            self._transition(ProcessStatus.CANCELLED)
-            self._result = Result(status=ProcessStatus.CANCELLED)
-            self._cleanup()
+            try:
+                self._transition(ProcessStatus.STOPPING)
+                self._container.kill()
+                self._transition(ProcessStatus.CANCELLED)
+                self._result = Result(status=ProcessStatus.CANCELLED)
+                self._cleanup()
+            except Exception as exc:
+                if self._status is ProcessStatus.STOPPING:
+                    self._status = ProcessStatus.RUNNING
+                raise ProviderError(str(exc)) from exc
 
     def cancel(self) -> None:
         if self._status is ProcessStatus.CREATED:
@@ -225,8 +245,14 @@ class DockerProvider:
         )
 
     def create_machine(self, **kwargs) -> Machine:
-        if kwargs:
+        allowed = {"image", "client_kwargs"}
+        unsupported = sorted(set(kwargs) - allowed)
+        if unsupported:
             raise ProviderConfigurationError(
-                f"unsupported docker provider options: {sorted(kwargs)}"
+                f"unsupported docker provider options: {unsupported}"
             )
-        return DockerMachine(self.config)
+        config = DockerProviderConfig(
+            kwargs.get("image", self.config.image),
+            kwargs.get("client_kwargs", self.config.client_kwargs),
+        )
+        return DockerMachine(config)
