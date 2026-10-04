@@ -14,6 +14,8 @@ def canonical_bytes(value: Any) -> bytes:
         try:
             return workflow_to_json(value).encode("utf-8")
         except SerializationError as exc:
+            if "non-finite" in str(exc):
+                raise ValueError(str(exc)) from exc
             raise TypeError(f"unsupported identity value: {type(exc).__name__}") from exc
     try:
         encoded = json.dumps(
