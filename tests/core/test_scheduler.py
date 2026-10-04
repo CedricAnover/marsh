@@ -109,6 +109,7 @@ def test_fail_fast_cancels_pending_work_but_does_not_claim_running_work_was_canc
     release = threading.Event()
 
     def fail(inputs, dependencies):
+        started.wait(1)
         return Result(status=ProcessStatus.FAILED, error="boom")
 
     def running(inputs, dependencies):
