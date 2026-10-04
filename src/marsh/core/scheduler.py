@@ -241,6 +241,7 @@ class ExecutorScheduler(ConcurrentScheduler):
         *,
         on_start: OnStart | None = None,
         on_complete: OnComplete | None = None,
+        on_blocked: OnBlocked | None = None,
         fail_fast: bool = False,
     ) -> dict[str, Result]:
         self.reset()
@@ -333,6 +334,7 @@ class ProcessScheduler(ExecutorScheduler):
         *,
         on_start: OnStart | None = None,
         on_complete: OnComplete | None = None,
+        on_blocked: OnBlocked | None = None,
         fail_fast: bool = False,
     ) -> dict[str, Result]:
         if not _is_picklable(run_task):
