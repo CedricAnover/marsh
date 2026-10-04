@@ -343,7 +343,7 @@ def execute_workflow(
 
         registry = provider_registry or ProviderRegistry({"local": _LocalProvider()})
         config = provider if isinstance(provider, ProviderConfig) else ProviderConfig(str(provider))
-        machine = registry.resolve(config).create_machine()
+        machine = registry.resolve(config).create_machine(**dict(config.options))
     else:
         machine = machine or LocalMachine()
     scheduler = scheduler or SequentialScheduler()
