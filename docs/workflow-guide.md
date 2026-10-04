@@ -240,7 +240,19 @@ ProcessSpec(
 
 Keeping this description separate from execution allows validation, planning, serialization, and execution to remain independently testable.
 
-## 10. Existing APIs and compatibility
+## 10. Runtime policies
+
+v0.3.7 makes runtime-control behavior explicit and backend-independent.
+
+The lifecycle is: attempt starts -> execute -> terminal outcome -> cleanup exactly once -> retry decision -> either a new attempt or final result.
+
+Use ExecutionPolicy to define retry, timeout, failure, resource, cleanup, cancellation, restart, scheduling, and cache behavior. Policy decisions are resolved before backend-specific mechanisms determine workflow semantics.
+
+Retries are conservative: non-idempotent tasks are not retried unless explicitly permitted, cleanup failure blocks automatic retry by default, and each retry has a new attempt identity. Cancellation is represented as a request followed by backend confirmation; a request alone is not a false CANCELLED result.
+
+Portable workflow definitions can store policy data in the canonical Workflow policy field and round-trip through marsh.workflow/v1. Runtime-only callbacks such as cleanup functions are intentionally not portable IR data.
+
+## 11. Existing APIs and compatibility
 
 Marsh retains its established lower-level APIs:
 
@@ -253,7 +265,7 @@ New workflow functionality should prefer the canonical Workflow contracts and ad
 
 For migration-oriented examples and the full public surface, start with the [repository README](../README.md).
 
-## 11. Recommended application pattern
+## 12. Recommended application pattern
 
 For new applications, use this sequence:
 
@@ -281,7 +293,7 @@ The separation is intentional:
 4. **Execute** — run through the canonical scheduler/runtime.
 5. **Inspect results** — consume structured outcomes.
 
-## 12. Current boundaries
+## 13. Current boundaries
 
 The current Alpha implementation has deliberate limits:
 
@@ -294,7 +306,7 @@ The current Alpha implementation has deliberate limits:
 
 These are implementation boundaries, not a reason to introduce a second workflow engine.
 
-## 13. Developer verification
+## 14. Developer verification
 
 Install the development environment:
 
@@ -322,7 +334,7 @@ uv build
 
 Canonical examples live under [`samples/`](../samples/).
 
-## 14. Architecture reference
+## 15. Architecture reference
 
 The implemented architecture can be summarized as:
 

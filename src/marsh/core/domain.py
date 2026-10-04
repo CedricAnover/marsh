@@ -141,6 +141,7 @@ class Workflow:
     inputs: Mapping[str, Any] = field(default_factory=dict)
     outputs: Mapping[str, Any] = field(default_factory=dict)
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    policy: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.id or not self.id.strip():

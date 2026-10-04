@@ -137,3 +137,16 @@ execute_workflow(workflow, provider=config)
 ```
 
 A new backend should therefore add a Provider/Adapter and conformance tests rather than introduce provider-specific branching into Workflow or planning.
+
+
+## Runtime policy control (v0.3.7)
+
+Policies are declarative inputs to one backend-independent runtime-control boundary. The policy layer decides semantics; schedulers, providers, machines, and processes implement mechanisms.
+
+Policy flow: Workflow/Task -> Policy configuration -> Policy evaluator -> effective timeout / attempt identity / terminal outcome arbitration / cleanup decision / retry decision -> Scheduler/Provider/Process -> Result and lifecycle events.
+
+The attempt lifecycle is: execute -> terminal outcome -> cleanup at most once -> retry decision -> either a new attempt identity or final outcome.
+
+Cancellation is a request followed by mechanism-specific stop/terminate/kill and confirmation. A cancellation request is not itself a confirmed CANCELLED result. Timeout cleanup completes before retry eligibility is evaluated.
+
+The policy evaluator is pure and inspectable. Backend differences must not change the policy decision for the same policy, task metadata, outcome, and control history. Runtime-only callbacks such as cleanup functions remain outside the portable IR serialization boundary.
