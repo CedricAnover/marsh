@@ -146,8 +146,7 @@ def test_fail_fast_cancels_pending_work_but_does_not_claim_running_work_was_canc
     assert results["b"].ok
 
 
-@pytest.mark.asyncio
-async def test_async_scheduler_executes_async_operations_with_bound():
+def test_async_scheduler_executes_async_operations_with_bound():
     active = 0
     maximum = 0
 
@@ -167,7 +166,7 @@ async def test_async_scheduler_executes_async_operations_with_bound():
         ),
     )
 
-    results = await execute_workflow_async(workflow, scheduler=AsyncScheduler(2))
+    results = asyncio.run(execute_workflow_async(workflow, scheduler=AsyncScheduler(2)))
 
     assert all(result.ok for result in results.values())
     assert maximum <= 2
