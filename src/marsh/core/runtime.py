@@ -363,7 +363,7 @@ def execute_workflow(
     else:
         machine = machine or LocalMachine()
     scheduler = scheduler or SequentialScheduler()
-    policy = policy or ExecutionPolicy()
+    policy = policy or ExecutionPolicy.from_mapping(workflow.policy)
     results: dict[str, Result] = {}
     sequence = 0
 
@@ -478,7 +478,7 @@ async def execute_workflow_async(
 ) -> dict[str, Result]:
     """Execute a workflow with bounded asyncio concurrency."""
     scheduler = scheduler or AsyncScheduler()
-    policy = policy or ExecutionPolicy()
+    policy = policy or ExecutionPolicy.from_mapping(workflow.policy)
     machine = machine or LocalMachine()
     results: dict[str, Result] = {}
     sequence = 0
