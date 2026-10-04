@@ -71,12 +71,23 @@ def test_empty_command(local_executor, mocker):
         local_executor.run(b"", b"")
 
 
-def test_timeout(local_executor, mocker, monkeypatch):
-    mocker.patch.object(local_executor.command_grammar, 'build_cmd', return_value=["bash", "-c", "sleep 5"])
-    local_executor.timeout = 1  # Set the timeout class field to 1
+def test_timeout(local_executor, mocker):
+    mocker.patch.object(
+        local_executor.command_grammar,
+        "build_cmd",
+        return_value=["deterministic-command"],
+    )
+    mock_popen = mocker.patch("subprocess.Popen", autospec=True)
+    mock_popen.return_value.communicate.side_effect = subprocess.TimeoutExpired(
+        cmd=["deterministic-command"],
+        timeout=1,
+    )
+    local_executor.timeout = 1
 
     with pytest.raises(subprocess.TimeoutExpired):
-        local_executor.run(b"", b"")  # Setting a short timeout
+        local_executor.run(b"", b"")
+
+    mock_popen.return_value.communicate.assert_called_once_with(timeout=1)
 
 
 def test_pipe_prev_stdout(local_executor, mocker):
@@ -92,15 +103,27 @@ def test_pipe_prev_stdout(local_executor, mocker):
 
 
 def test_callback_function(local_executor, mocker):
-    mocker.patch.object(local_executor.command_grammar, 'build_cmd', return_value=["echo", "test"])
+    mocker.patch.object(
+        local_executor.command_grammar,
+        "build_cmd",
+        return_value=["deterministic-command"],
+    )
+    mock_popen = mocker.patch("subprocess.Popen", autospec=True)
+    process = mock_popen.return_value
 
     def custom_callback(process, stdout, stderr, *args, **kwargs):
-        # Modify the output from the subprocess
         return b"modified-stdout", b"modified-stderr"
 
     stdout, stderr = local_executor.run(b"", b"", callback=custom_callback)
+
     assert stdout == b"modified-stdout"
     assert stderr == b"modified-stderr"
+    mock_popen.assert_called_once_with(
+        ["deterministic-command"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
 
 
 def test_large_command(local_executor, mocker):
@@ -127,12 +150,17 @@ def test_empty_output(local_executor, mocker):
 
 
 def test_invalid_callback_return(local_executor, mocker):
-    mocker.patch.object(local_executor.command_grammar, 'build_cmd', return_value=["bash", "-c", "echo TEST"])
+    mocker.patch.object(
+        local_executor.command_grammar,
+        "build_cmd",
+        return_value=["deterministic-command"],
+    )
+    mocker.patch("subprocess.Popen", autospec=True)
 
     def invalid_callback(process, stdout, stderr, *args, **kwargs):
-        pass  # Incorrect return type
+        pass
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"Given callback must return tuple\[bytes, bytes\]"):
         local_executor.run(b"", b"", callback=invalid_callback)
 
 
@@ -411,43 +439,48 @@ def test_pyinterpreter_executor_initialization(mocker):
 
 
 def test_run_with_valid_python_code(mocker):
-    """Test that PyInterpreterExecutor runs valid Python code."""
+    """Test PyInterpreterExecutor with deterministic mocked process execution."""
     executor = PyInterpreterExecutor(
         shell_cmd="bash -c",
         py_cmd="python -c"
     )
-    x_stdout = b"mock_x_stdout"
-    x_stderr = b"mock_x_stderr"
-    py_code = "print('Hello World')"
+    mock_popen = mocker.patch("subprocess.Popen", autospec=True)
+    mock_process = mock_popen.return_value
+    mock_process.communicate.return_value = (b"Hello World", b"")
 
     stdout, stderr = executor.run(
-        x_stdout=x_stdout,
-        x_stderr=x_stderr,
-        py_code=py_code
+        x_stdout=b"mock_x_stdout",
+        x_stderr=b"mock_x_stderr",
+        py_code="print('Hello World')",
     )
 
     assert stdout.strip() == b"Hello World"
     assert stderr.strip() == b""
+    mock_popen.assert_called_once()
+    assert mock_process.communicate.call_args.kwargs["timeout"] == 600
 
 
 def test_run_with_template_substitution(mocker):
-    """Test template substitution for x_stdout and x_stderr in the Python code."""
+    """Test template substitution without invoking a host shell."""
     executor = PyInterpreterExecutor(
         shell_cmd="bash -c",
         py_cmd="python -c"
     )
-    x_stdout = b"Hello"
-    x_stderr = b"World"
-    py_code = "result = $x_stdout.decode().strip() + ' ' + $x_stderr.decode().strip(); print(result)"
+    mock_popen = mocker.patch("subprocess.Popen", autospec=True)
+    mock_process = mock_popen.return_value
+    mock_process.communicate.return_value = (b"Hello World", b"")
 
     stdout, stderr = executor.run(
-        x_stdout=x_stdout,
-        x_stderr=x_stderr,
-        py_code=py_code
+        x_stdout=b"Hello",
+        x_stderr=b"World",
+        py_code="result = $x_stdout.decode().strip() + ' ' + $x_stderr.decode().strip(); print(result)",
     )
 
     assert stdout.strip() == b"Hello World"
     assert stderr.strip() == b""
+    input_bytes = mock_process.communicate.call_args.kwargs["input"]
+    assert b"b'Hello'" in input_bytes
+    assert b"b'World'" in input_bytes
 
 
 def test_run_with_invalid_python_code(mocker):
