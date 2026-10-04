@@ -5,12 +5,16 @@ import json
 from typing import Any
 
 from marsh.core.domain import Workflow
+from marsh.core.ir.errors import SerializationError
 from marsh.core.serialization import workflow_to_json
 
 
 def canonical_bytes(value: Any) -> bytes:
     if isinstance(value, Workflow):
-        return workflow_to_json(value).encode("utf-8")
+        try:
+            return workflow_to_json(value).encode("utf-8")
+        except SerializationError as exc:
+            raise TypeError(f"unsupported identity value: {type(exc).__name__}") from exc
     try:
         encoded = json.dumps(
             value,
