@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import functools
+import inspect
 import os
 import subprocess
 import time
@@ -19,6 +21,7 @@ from marsh.core.domain import (
 )
 from marsh.core.observability import EventType, Observer, RuntimeEvent, emit_event
 from marsh.core.policies import ExecutionPolicy
+from marsh.core.scheduler import AsyncScheduler, ProcessScheduler, ThreadScheduler
 
 
 class _LocalProvider:
@@ -45,36 +48,25 @@ class ExecutionPlan:
 
 
 def plan_workflow(workflow: Workflow) -> ExecutionPlan:
-    """Validate dependencies and return a deterministic topological plan."""
+    """Validate dependencies and return a deterministic graphlib-backed plan."""
+    from graphlib import TopologicalSorter
+
     tasks = {task.id: task for task in workflow.tasks}
-    indegree = {task.id: len(task.dependencies) for task in workflow.tasks}
-    dependents = {task.id: [] for task in workflow.tasks}
+    graph = {
+        task_id: tuple(sorted(tasks[task_id].dependencies))
+        for task_id in sorted(tasks)
+    }
+    try:
+        order = tuple(TopologicalSorter(graph).static_order())
+    except ValueError as exc:
+        raise ValueError("workflow contains a dependency cycle") from exc
 
-    for task in workflow.tasks:
-        for dependency in task.dependencies:
-            if dependency not in tasks:
-                raise ValueError(
-                    f"task {task.id!r} has unknown dependency: {dependency}"
-                )
-            dependents[dependency].append(task.id)
-
-    ready = sorted(task_id for task_id, degree in indegree.items() if degree == 0)
-    initial_ready = tuple(ready)
-    order = []
-
-    while ready:
-        task_id = ready.pop(0)
-        order.append(task_id)
-        for dependent in sorted(dependents[task_id]):
-            indegree[dependent] -= 1
-            if indegree[dependent] == 0:
-                ready.append(dependent)
-        ready.sort()
-
-    if len(order) != len(tasks):
-        raise ValueError("workflow contains a dependency cycle")
-
-    return ExecutionPlan(order=tuple(order), ready=initial_ready)
+    initial_ready = tuple(
+        task_id
+        for task_id in sorted(tasks)
+        if not tasks[task_id].dependencies
+    )
+    return ExecutionPlan(order=order, ready=initial_ready)
 
 
 class LocalProcess:
@@ -367,6 +359,36 @@ def execute_workflow(
 
     notify(EventType.WORKFLOW_STARTED)
 
+    if isinstance(scheduler, (AsyncScheduler, ThreadScheduler, ProcessScheduler)):
+        if isinstance(scheduler, AsyncScheduler):
+            raise TypeError("use execute_workflow_async() with AsyncScheduler")
+        if isinstance(scheduler, ProcessScheduler):
+            run_task = functools.partial(_execute_process_task, policy=policy)
+        else:
+            run_task = lambda task, dependencies: _execute_task(
+                task, machine, dependencies, policy, cache
+            )
+        results.update(
+            scheduler.execute(
+                workflow,
+                run_task,
+                on_start=lambda task_id: notify(EventType.TASK_STARTED, task_id),
+                on_complete=lambda task_id, result: notify(
+                    EventType.TASK_FAILED if result.failed else EventType.TASK_COMPLETED,
+                    task_id,
+                    result,
+                ),
+                on_blocked=lambda task_id, result: notify(
+                    EventType.TASK_SKIPPED,
+                    task_id,
+                    result,
+                ),
+                fail_fast=policy.failure.mode == "fail_fast",
+            )
+        )
+        notify(EventType.WORKFLOW_COMPLETED)
+        return results
+
     for task in scheduler.schedule(workflow):
         failed_dependencies = [
             dependency
@@ -409,5 +431,75 @@ def execute_workflow(
         if result.failed and not policy.failure.should_continue(result):
             break
 
+    notify(EventType.WORKFLOW_COMPLETED)
+    return results
+
+
+def _execute_process_task(
+    task: Task,
+    dependency_results: Mapping[str, Result],
+    policy: ExecutionPolicy,
+) -> Result:
+    """Process-safe callback; no live machine, observer, or cache crosses the boundary."""
+    return _execute_task(task, LocalMachine(), dependency_results, policy, None)
+
+
+async def execute_workflow_async(
+    workflow: Workflow,
+    scheduler: AsyncScheduler | None = None,
+    policy: ExecutionPolicy | None = None,
+    observers: tuple[Observer, ...] = (),
+    cache: Cache | None = None,
+    machine: LocalMachine | None = None,
+) -> dict[str, Result]:
+    """Execute a workflow with bounded asyncio concurrency."""
+    scheduler = scheduler or AsyncScheduler()
+    policy = policy or ExecutionPolicy()
+    machine = machine or LocalMachine()
+    results: dict[str, Result] = {}
+    sequence = 0
+
+    def notify(event_type: EventType, task_id: str | None = None, result: Result | None = None) -> None:
+        nonlocal sequence
+        sequence += 1
+        event = RuntimeEvent(
+            sequence=sequence,
+            event_type=event_type,
+            workflow_id=workflow.id,
+            task_id=task_id,
+            status=result.status if result is not None else None,
+            metadata={"duration": result.duration} if result is not None else {},
+        )
+        for observer in observers:
+            emit_event(observer, event)
+
+    async def run_task(task: Task, dependencies: Mapping[str, Result]) -> Result:
+        operation = task.operation
+        if callable(operation):
+            value = operation(task.inputs, dependencies)
+            if inspect.isawaitable(value):
+                value = await value
+            if isinstance(value, Result):
+                return value
+            return Result(status=ProcessStatus.FAILED, error="task operation must return a Result")
+        return _execute_task(task, machine, dependencies, policy, cache)
+
+    notify(EventType.WORKFLOW_STARTED)
+    results.update(await scheduler.execute(
+        workflow,
+        run_task,
+        on_start=lambda task_id: notify(EventType.TASK_STARTED, task_id),
+        on_complete=lambda task_id, result: notify(
+            EventType.TASK_FAILED if result.failed else EventType.TASK_COMPLETED,
+            task_id,
+            result,
+        ),
+        on_blocked=lambda task_id, result: notify(
+            EventType.TASK_SKIPPED,
+            task_id,
+            result,
+        ),
+        fail_fast=policy.failure.mode == "fail_fast",
+    ))
     notify(EventType.WORKFLOW_COMPLETED)
     return results

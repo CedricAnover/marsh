@@ -207,26 +207,32 @@ Execute a validated workflow with:
 results = execute_workflow(workflow)
 ```
 
-The current canonical runtime uses a **sequential local execution model**.
+The canonical runtime supports deterministic sequential execution and bounded concurrent execution.
 
 Conceptually:
 
     Workflow
         |
         v
-    Validation
+    Validation / Planning
         |
         v
-    Execution Plan
+    Scheduler State Machine
+        |
+        +--> Sequential Scheduler
+        +--> Async Scheduler
+        +--> Thread Scheduler
+        +--> Process Scheduler
         |
         v
-    Sequential Scheduler
-        |
-        v
-    Local Process Execution
+    Execution Mechanism
         |
         v
     Structured Results
+
+Concurrent schedulers share the same dependency semantics and bounded ready-queue state machine. The scheduler controls readiness and dispatch; execution mechanisms remain responsible for running individual tasks.
+
+For async execution, use `execute_workflow_async()`. For bounded thread or process execution, pass `ThreadScheduler(max_concurrency=...)` or `ProcessScheduler(max_concurrency=...)` to `execute_workflow()`.
 
 The workflow model is intentionally separated from the runtime so additional scheduling and execution mechanisms can be introduced without creating another workflow engine.
 
