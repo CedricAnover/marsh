@@ -1,0 +1,26 @@
+name: Temporary Windows diagnostic
+
+on:
+  push:
+    branches:
+      - test/issues-10-11-processor-modifier-unit-tests
+
+jobs:
+  diagnostic:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --all-groups
+      - name: Run portable pytest with JUnit diagnostics
+        shell: bash
+        run: |
+          uv run pytest -vv --tb=short --junitxml=windows-diagnostic.xml tests --ignore=tests/bash --ignore=tests/docker --ignore=tests/ssh
+      - name: Upload JUnit diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-diagnostic
+          path: windows-diagnostic.xml
