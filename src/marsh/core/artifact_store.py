@@ -53,7 +53,12 @@ class LocalArtifactStore:
                     handle.write(data)
                     handle.flush()
                     os.fsync(handle.fileno())
-                os.replace(temp_name, destination)
+                try:
+                    os.replace(temp_name, destination)
+                except PermissionError:
+                    if not destination.exists():
+                        raise
+                    self.get(ref)
             finally:
                 try:
                     os.unlink(temp_name)
