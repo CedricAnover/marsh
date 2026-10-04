@@ -150,6 +150,7 @@ class AsyncScheduler(ConcurrentScheduler):
         *,
         on_start: OnStart | None = None,
         on_complete: OnComplete | None = None,
+        fail_fast: bool = False,
     ) -> dict[str, Result]:
         self.reset()
         state = SchedulerState.for_workflow(workflow)
@@ -191,7 +192,7 @@ class AsyncScheduler(ConcurrentScheduler):
                 state.mark_completed(task_id, result)
                 if on_complete is not None:
                     on_complete(task_id, result)
-                if result.failed and not ExecutionPolicy().failure.should_continue(result):
+                if fail_fast and result.failed:
                     self._cancel_requested = True
 
             if self._cancel_requested and running:
