@@ -1,39 +1,17 @@
 """Workflow validation and deterministic serialization."""
 
 import json
-from heapq import heappop, heappush
 from typing import Any, Mapping
 
 from marsh.core.configuration import normalize_workflow
 from marsh.core.domain import Workflow
+from marsh.core.runtime import plan_workflow
 
 
 def validate_workflow(workflow: Workflow | Mapping[str, Any]) -> tuple[str, ...]:
-    workflow = normalize_workflow(workflow)
-    tasks = {task.id: task for task in workflow.tasks}
-    indegree = {task_id: 0 for task_id in tasks}
-    dependents = {task_id: [] for task_id in tasks}
-    for task in workflow.tasks:
-        for dependency in task.dependencies:
-            if dependency not in tasks:
-                raise ValueError(f"task {task.id!r} has unknown dependencies: {dependency}")
-            indegree[task.id] += 1
-            dependents[dependency].append(task.id)
-    ready = []
-    for task_id, degree in indegree.items():
-        if degree == 0:
-            heappush(ready, task_id)
-    order = []
-    while ready:
-        task_id = heappop(ready)
-        order.append(task_id)
-        for dependent in sorted(dependents[task_id]):
-            indegree[dependent] -= 1
-            if indegree[dependent] == 0:
-                heappush(ready, dependent)
-    if len(order) != len(tasks):
-        raise ValueError("workflow contains a dependency cycle")
-    return tuple(order)
+    """Validate dependencies using the canonical planning semantic owner."""
+
+    return plan_workflow(normalize_workflow(workflow)).order
 
 
 def _data(value: Any) -> Any:

@@ -288,3 +288,82 @@ def test_execute_workflow_uses_opt_in_cache_only_for_successful_results():
 
     assert first["task"] == second["task"]
     assert first["task"].stdout.strip() == b"cached"
+
+
+def test_execute_workflow_accepts_replacement_scheduler_and_machine_contracts():
+    seen = []
+
+    class FakeProcess:
+        def __init__(self, result):
+            self.result = result
+
+        def start(self):
+            seen.append("start")
+
+        def wait(self):
+            seen.append("wait")
+            return self.result
+
+    class FakeMachine:
+        def create_process(self, spec):
+            seen.append(("machine", spec.executable))
+            return FakeProcess(Result(stdout=b"fake"))
+
+    class FakeScheduler:
+        def schedule(self, workflow):
+            seen.append("schedule")
+            return tuple(reversed(workflow.tasks))
+
+    workflow = Workflow(
+        id="replaceable",
+        tasks=(
+            Task(id="a", operation=ProcessSpec(executable="fake-a")),
+            Task(id="b", operation=ProcessSpec(executable="fake-b")),
+        ),
+    )
+
+    results = execute_workflow(
+        workflow,
+        machine=FakeMachine(),
+        scheduler=FakeScheduler(),
+    )
+
+    assert seen == [
+        "schedule",
+        ("machine", "fake-b"),
+        "start",
+        "wait",
+        ("machine", "fake-a"),
+        "start",
+        "wait",
+    ]
+    assert all(result.ok for result in results.values())
+
+
+def test_execute_workflow_fail_fast_stops_after_first_failed_task():
+    seen = []
+
+    def fail(inputs, dependencies):
+        seen.append("fail")
+        return Result(status=ProcessStatus.FAILED, error="boom")
+
+    def independent(inputs, dependencies):
+        seen.append("independent")
+        return Result(stdout=b"ok")
+
+    workflow = Workflow(
+        id="fail-fast",
+        tasks=(
+            Task(id="fail", operation=fail),
+            Task(id="independent", operation=independent),
+        ),
+    )
+
+    results = execute_workflow(
+        workflow,
+        policy=ExecutionPolicy(failure=FailurePolicy("fail_fast")),
+    )
+
+    assert seen == ["fail"]
+    assert results["fail"].status is ProcessStatus.FAILED
+    assert "independent" not in results
