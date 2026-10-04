@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from dataclasses import dataclass
 from typing import Any, Mapping, Protocol
 
 from marsh.core.domain import ProcessSpec, Result, Task
+from marsh.core.identity import canonical_bytes, content_digest
 
 
 class Cache(Protocol):
@@ -37,7 +36,7 @@ class CachePolicy:
     enabled: bool = False
     namespace: str = "marsh"
 
-    def __post_init__(self) -> None:
+    def __post_init__(self):
         if not self.namespace.strip():
             raise ValueError("cache namespace must be non-empty")
 
@@ -60,9 +59,11 @@ def cache_key_for_task(
                 "arguments": list(task.operation.arguments),
                 "environment": dict(sorted(task.operation.environment.items())),
                 "working_directory": task.operation.working_directory,
-                "stdin": task.operation.stdin.hex()
-                if task.operation.stdin is not None
-                else None,
+                "stdin": (
+                    task.operation.stdin.hex()
+                    if task.operation.stdin is not None
+                    else None
+                ),
                 "timeout": task.operation.timeout,
                 "machine": task.operation.machine,
                 "resources": dict(sorted(task.operation.resources.items())),
@@ -81,11 +82,6 @@ def cache_key_for_task(
                 for name, result in sorted(dependency_results.items())
             },
         }
-        encoded = json.dumps(
-            payload,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode()
+        return content_digest(canonical_bytes(payload))
     except (TypeError, ValueError):
         return None
-    return hashlib.sha256(encoded).hexdigest()
