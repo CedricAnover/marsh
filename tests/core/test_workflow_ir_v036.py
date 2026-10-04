@@ -1,5 +1,4 @@
 import json
-import subprocess
 import sys
 
 import pytest
@@ -94,3 +93,33 @@ def test_process_spec_round_trip_preserves_semantics():
 def test_resolution_does_not_evaluate_serialized_code():
     ref = operation_to_ref(top_level_operation)
     assert resolve_operation(ref) is top_level_operation
+
+
+def test_reconstruction_works_across_a_fresh_python_process():
+    workflow = Workflow(id="cross-process", tasks=(Task(id="run", operation=top_level_operation),))
+    payload = workflow_to_json(workflow)
+    script = """
+import json
+import sys
+from marsh.core.serialization import workflow_from_json
+workflow = workflow_from_json(sys.argv[1])
+assert workflow.id == "cross-process"
+assert workflow.task("run").operation.__name__ == "top_level_operation"
+print("ok")
+"""
+    result = __import__("subprocess").run(
+        [sys.executable, "-c", script, payload],
+        cwd=__import__("pathlib").Path(__file__).resolve().parents[2],
+        env={**__import__("os").environ, "PYTHONPATH": "src"},
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert result.stdout.strip() == "ok"
+
+
+def test_legacy_mapping_authoring_still_normalizes():
+    legacy = {"id": "legacy", "tasks": [{"id": "task", "operation": "echo"}]}
+    restored = __import__("marsh.core.serialization", fromlist=["workflow_from_dict"]).workflow_from_dict(legacy)
+    assert restored.id == "legacy"
+    assert restored.task("task").operation == "echo"
