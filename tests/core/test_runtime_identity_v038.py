@@ -1,6 +1,8 @@
+import sys
+
 from marsh.core.artifact_store import LocalArtifactStore
 from marsh.core.cache import MemoryCache
-from marsh.core.domain import ProcessStatus, Result, Task, Workflow
+from marsh.core.domain import ProcessSpec, ProcessStatus, Result, Task, Workflow
 from marsh.core.policies import ExecutionPolicy, RetryPolicy
 from marsh.core.runtime import execute_workflow
 
@@ -42,13 +44,17 @@ def test_retry_keeps_execution_identity_but_changes_attempt_identity(tmp_path):
 def test_cache_hit_reuses_execution_identity_without_creating_attempt():
     calls = []
 
-    def operation(inputs, dependencies):
-        calls.append(1)
-        return Result(stdout=b"cached")
-
     workflow = Workflow(
         id="cache-identity",
-        tasks=(Task(id="task", operation=operation),),
+        tasks=(
+            Task(
+                id="task",
+                operation=ProcessSpec(
+                    executable=sys.executable,
+                    arguments=("-c", "print('cached')"),
+                ),
+            ),
+        ),
     )
     cache = MemoryCache()
     policy = ExecutionPolicy.from_mapping(
