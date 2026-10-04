@@ -34,6 +34,35 @@ The existing command and DAG APIs remain useful low-level building blocks and co
 
 This document describes the architecture implemented by the current Alpha release. Future capabilities are described only as extension boundaries and are not presented as implemented features.
 
+### Scheduler state machine (v0.3.5)
+
+The canonical runtime now uses one shared scheduler state model across sequential and bounded-concurrency modes:
+
+```text
+READY -> RUNNING -> SUCCEEDED
+                 -> FAILED
+                 -> CANCELLED
+READY -> BLOCKED
+```
+
+Dependency readiness is defined by `all(dependency == SUCCEEDED)`. Failed, cancelled, or blocked dependencies prevent downstream dispatch. Concurrent modes use a deterministic ready ordering and a hard `max_concurrency` bound.
+
+The scheduler owns readiness and dispatch policy; Machine/Process/Provider components own execution. Process-mode execution crosses the process boundary only with serializable task state, dependency results, and a picklable execution callback.
+
+```text
+Workflow
+  |
+  v
+Validation / graphlib planning
+  |
+  v
+Scheduler state machine
+  |---- READY tasks ----> bounded dispatch ----> execution
+  |                                             |
+  +<------------- Result / state ---------------+
+```
+
+
 
 ## Provider boundary (v0.3.4)
 
