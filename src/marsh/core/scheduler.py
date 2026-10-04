@@ -103,7 +103,7 @@ class ConcurrentScheduler:
         return ready
 
     @staticmethod
-    def _block_unrunnable(workflow: Workflow, state: SchedulerState) -> bool:
+    def _block_unrunnable(workflow: Workflow, state: SchedulerState, on_blocked: OnBlocked | None = None) -> bool:
         changed = False
         for task in sorted(workflow.tasks, key=lambda item: item.id):
             if state.states[task.id] is not TaskState.READY:
@@ -129,7 +129,7 @@ class ConcurrentScheduler:
         on_start: OnStart | None,
         on_blocked: OnBlocked | None,
     ) -> list[Task]:
-        self._block_unrunnable(workflow, state)
+        self._block_unrunnable(workflow, state, on_blocked)
         if self._cancel_requested:
             for task in workflow.tasks:
                 if state.states[task.id] is TaskState.READY:
