@@ -107,9 +107,11 @@ def test_thread_scheduler_marks_dependents_blocked_after_failure():
 def test_fail_fast_cancels_pending_work_but_does_not_claim_running_work_was_cancelled():
     started = threading.Event()
     release = threading.Event()
+    failed = threading.Event()
 
     def fail(inputs, dependencies):
         started.wait(1)
+        failed.set()
         return Result(status=ProcessStatus.FAILED, error="boom")
 
     def running(inputs, dependencies):
@@ -138,6 +140,7 @@ def test_fail_fast_cancels_pending_work_but_does_not_claim_running_work_was_canc
     thread = threading.Thread(target=run)
     thread.start()
     assert started.wait(1)
+    assert failed.wait(1)
     release.set()
     thread.join(2)
 
