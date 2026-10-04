@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import os
 import subprocess
 import time
@@ -19,6 +20,7 @@ from marsh.core.domain import (
 )
 from marsh.core.observability import EventType, Observer, RuntimeEvent, emit_event
 from marsh.core.policies import ExecutionPolicy
+from marsh.core.scheduler import AsyncScheduler, ProcessScheduler, ThreadScheduler
 
 
 class _LocalProvider:
@@ -367,6 +369,24 @@ def execute_workflow(
 
     notify(EventType.WORKFLOW_STARTED)
 
+    if isinstance(scheduler, (AsyncScheduler, ThreadScheduler, ProcessScheduler)):
+        if isinstance(scheduler, AsyncScheduler):
+            raise TypeError("use execute_workflow_async() with AsyncScheduler")
+        run_task = lambda task, dependencies: _execute_task(
+            task, machine, dependencies, policy, cache
+        )
+        return scheduler.execute(
+            workflow,
+            run_task if not isinstance(scheduler, ProcessScheduler) else _execute_process_task,
+            on_start=lambda task_id: notify(EventType.TASK_STARTED, task_id),
+            on_complete=lambda task_id, result: notify(
+                EventType.TASK_FAILED if result.failed else EventType.TASK_COMPLETED,
+                task_id,
+                result,
+            ),
+            fail_fast=policy.failure.mode == "fail_fast",
+        )
+
     for task in scheduler.schedule(workflow):
         failed_dependencies = [
             dependency
@@ -409,5 +429,68 @@ def execute_workflow(
         if result.failed and not policy.failure.should_continue(result):
             break
 
+    notify(EventType.WORKFLOW_COMPLETED)
+    return results
+
+
+def _execute_process_task(
+    task: Task,
+    dependency_results: Mapping[str, Result],
+) -> Result:
+    """Process-safe task callback; no live machine, observer, or cache crosses the boundary."""
+    return _execute_task(task, LocalMachine(), dependency_results, ExecutionPolicy())
+
+
+async def execute_workflow_async(
+    workflow: Workflow,
+    scheduler: AsyncScheduler | None = None,
+    policy: ExecutionPolicy | None = None,
+    observers: tuple[Observer, ...] = (),
+    cache: Cache | None = None,
+    machine: LocalMachine | None = None,
+) -> dict[str, Result]:
+    """Execute a workflow with bounded asyncio concurrency."""
+    scheduler = scheduler or AsyncScheduler()
+    policy = policy or ExecutionPolicy()
+    machine = machine or LocalMachine()
+    results: dict[str, Result] = {}
+    sequence = 0
+
+    def notify(event_type: EventType, task_id: str | None = None, result: Result | None = None) -> None:
+        nonlocal sequence
+        sequence += 1
+        event = RuntimeEvent(
+            sequence=sequence,
+            event_type=event_type,
+            workflow_id=workflow.id,
+            task_id=task_id,
+            status=result.status if result is not None else None,
+            metadata={"duration": result.duration} if result is not None else {},
+        )
+        for observer in observers:
+            emit_event(observer, event)
+
+    async def run_task(task: Task, dependencies: Mapping[str, Result]) -> Result:
+        operation = task.operation
+        if callable(operation):
+            value = operation(task.inputs, dependencies)
+            if inspect.isawaitable(value):
+                value = await value
+            if isinstance(value, Result):
+                return value
+            return Result(status=ProcessStatus.FAILED, error="task operation must return a Result")
+        return _execute_task(task, machine, dependencies, policy, cache)
+
+    notify(EventType.WORKFLOW_STARTED)
+    results.update(await scheduler.execute(
+        workflow,
+        run_task,
+        on_start=lambda task_id: notify(EventType.TASK_STARTED, task_id),
+        on_complete=lambda task_id, result: notify(
+            EventType.TASK_FAILED if result.failed else EventType.TASK_COMPLETED,
+            task_id,
+            result,
+        ),
+    ))
     notify(EventType.WORKFLOW_COMPLETED)
     return results
