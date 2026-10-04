@@ -1,5 +1,6 @@
 import pprint
 import logging
+import sys
 
 from ..utils.output_streams import mask_sensitive_data
 from ..logger import create_console_logger
@@ -17,10 +18,10 @@ def print_output_stream(inp_stdout: bytes,
 
     if output_stream == "stdout":
         if inp_stdout.strip():
-            print(inp_stdout.decode(encoding).strip(), *args, **kwargs)
+            print(inp_stdout.decode(encoding).strip(), *args, file=sys.stdout, **kwargs)
     else:
         if inp_stderr.strip():
-            print(inp_stderr.decode(encoding).strip(), *args, **kwargs)
+            print(inp_stderr.decode(encoding).strip(), *args, file=sys.stderr, **kwargs)
 
 
 def print_stdout(inp_stdout: bytes, inp_stderr: bytes, *args, encoding='utf-8', **kwargs) -> None:
