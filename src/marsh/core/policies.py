@@ -194,7 +194,7 @@ class ExecutionPolicy:
         resources_data = data.get("resources")
         resources = None if resources_data is None else ResourcePolicy(dict(resources_data.get("available", resources_data)))
         failure_data = data.get("failure")
-        failure = FailurePolicy(str(failure_data.get("mode", "skip_dependents") if isinstance(failure_data, Mapping) else failure_data))
+        failure = FailurePolicy(str(failure_data.get("mode", "skip_dependents") if isinstance(failure_data, Mapping) else failure_data or "skip_dependents"))
         cache_data = data.get("cache")
         cache = CachePolicy(
             enabled=bool(cache_data.get("enabled", False) if isinstance(cache_data, Mapping) else cache_data or False),
