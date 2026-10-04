@@ -33,9 +33,9 @@ def test_print_output_stream_stdout(capsys):
 def test_print_output_stream_stderr(capsys):
     inp_stdout = b"stdout message"
     inp_stderr = b"stderr message"
-    sys.stderr.write(inp_stderr.decode('utf-8') + "\n")
     print_output_stream(inp_stdout, inp_stderr, output_stream="stderr")
     captured = capsys.readouterr()
+    assert captured.out == ""
     assert captured.err.strip() == "stderr message"
 
 
