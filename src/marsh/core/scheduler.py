@@ -130,8 +130,6 @@ class ConcurrentScheduler:
                 if state.states[task.id] is TaskState.READY:
                     state.states[task.id] = TaskState.CANCELLED
                     state.results[task.id] = Result(status=ProcessStatus.CANCELLED)
-                    if on_start is not None:
-                        on_start(task.id)
             return []
         capacity = self.max_concurrency - running
         dispatch = self._ready_tasks(workflow, state)[: max(0, capacity)]
