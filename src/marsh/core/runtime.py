@@ -8,9 +8,12 @@ import os
 import subprocess
 import time
 from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from typing import Any, Mapping
 
+from marsh.core.artifacts import ArtifactStore, Provenance
 from marsh.core.cache import Cache, cache_key_for_task
+from marsh.core.identity import execution_id
 from marsh.core.domain import (
     ProcessSpec,
     ProcessStatus,
@@ -22,6 +25,63 @@ from marsh.core.domain import (
 from marsh.core.observability import EventType, Observer, RuntimeEvent, emit_event
 from marsh.core.policies import ExecutionPolicy, evaluate_policy
 from marsh.core.scheduler import AsyncScheduler, ProcessScheduler, ThreadScheduler
+
+
+def _finalize_result(
+    result: Result,
+    *,
+    workflow_id: str,
+    execution_id_value: str | None,
+    task_id: str,
+    attempt_id: str | None,
+    artifact_store: ArtifactStore | None,
+) -> Result:
+    artifact_refs = []
+    if artifact_store is not None:
+        if result.stdout:
+            artifact_refs.append(
+                artifact_store.put(
+                    result.stdout,
+                    media_type="application/octet-stream",
+                )
+            )
+        if result.stderr:
+            artifact_refs.append(
+                artifact_store.put(
+                    result.stderr,
+                    media_type="application/octet-stream",
+                )
+            )
+
+    provenance = Provenance(
+        schema_version=1,
+        workflow_id=workflow_id,
+        task_id=task_id,
+        execution_id=execution_id_value,
+        attempt_id=attempt_id,
+        output_artifact_refs=tuple(
+            ref.digest for ref in artifact_refs
+        ),
+        created_at=datetime.now(timezone.utc).isoformat(),
+    ).to_dict()
+
+    return replace(
+        result,
+        execution_id=execution_id_value,
+        attempt_id=attempt_id,
+        artifact_refs=tuple(artifact_refs),
+        provenance=provenance,
+    )
+
+
+def _workflow_execution_id(
+    workflow: Workflow,
+    policy: ExecutionPolicy,
+) -> str | None:
+    try:
+        return execution_id(workflow, policy=policy.to_mapping())
+    except (TypeError, ValueError):
+        return None
 
 
 class _LocalProvider:
@@ -252,6 +312,10 @@ def _execute_task(
     dependency_results: Mapping[str, Result],
     policy: ExecutionPolicy,
     cache: Cache | None = None,
+    *,
+    workflow_id: str = "",
+    workflow_execution_id: str = "",
+    artifact_store: ArtifactStore | None = None,
 ) -> Result:
     operation = task.operation
     started_at = time.monotonic()
@@ -262,7 +326,11 @@ def _execute_task(
 
     cache_key = None
     if policy.cache.enabled and cache is not None:
-        cache_key = cache_key_for_task(task, dependency_results, namespace=policy.cache.namespace)
+        cache_key = cache_key_for_task(
+            task,
+            dependency_results,
+            namespace=policy.cache.namespace,
+        )
         if cache_key is not None:
             cached = cache.get(cache_key)
             if cached is not None and cached.ok:
@@ -271,10 +339,17 @@ def _execute_task(
     if policy.resources is not None:
         requested = task.metadata.get("resources", {})
         if not policy.resources.supports(requested):
-            return Result(
-                status=ProcessStatus.FAILED,
-                error=f"task {task.id!r} requests unsupported resources: {requested}",
-                duration=time.monotonic() - started_at,
+            return _finalize_result(
+                Result(
+                    status=ProcessStatus.FAILED,
+                    error=f"task {task.id!r} requests unsupported resources: {requested}",
+                    duration=time.monotonic() - started_at,
+                ),
+                workflow_id=workflow_id,
+                execution_id_value=workflow_execution_id,
+                task_id=task.id,
+                attempt_id=None,
+                artifact_store=artifact_store,
             )
 
     def run_cleanup(attempt: int) -> tuple[bool, str | None]:
@@ -305,7 +380,16 @@ def _execute_task(
         if cleanup_error is not None:
             metadata["cleanup_error"] = cleanup_error
         result = replace(result, metadata=metadata)
-        return None if decision.retry else result
+        if decision.retry:
+            return None
+        return _finalize_result(
+            result,
+            workflow_id=workflow_id,
+            execution_id_value=workflow_execution_id,
+            task_id=task.id,
+            attempt_id=metadata["attempt_id"],
+            artifact_store=artifact_store,
+        )
 
     if isinstance(operation, ProcessSpec):
         if policy.timeout is not None:
@@ -334,11 +418,18 @@ def _execute_task(
             if final is not None:
                 return final
 
-    return Result(
-        status=ProcessStatus.FAILED,
-        error=f"unsupported task operation: {type(operation).__name__}",
-        duration=time.monotonic() - started_at,
-        metadata={"attempt": 0, "attempt_id": f"{task.id}:0"},
+    return _finalize_result(
+        Result(
+            status=ProcessStatus.FAILED,
+            error=f"unsupported task operation: {type(operation).__name__}",
+            duration=time.monotonic() - started_at,
+            metadata={"attempt": 0, "attempt_id": f"{task.id}:0"},
+        ),
+        workflow_id=workflow_id,
+        execution_id_value=workflow_execution_id,
+        task_id=task.id,
+        attempt_id=f"{task.id}:0",
+        artifact_store=artifact_store,
     )
 
 def execute_workflow(
@@ -350,6 +441,7 @@ def execute_workflow(
     cache: Cache | None = None,
     provider=None,
     provider_registry=None,
+    artifact_store: ArtifactStore | None = None,
 ) -> dict[str, Result]:
     """Execute a workflow sequentially through a selected execution provider."""
     if machine is not None and provider is not None:
@@ -365,6 +457,7 @@ def execute_workflow(
     scheduler = scheduler or SequentialScheduler()
     policy = policy or ExecutionPolicy.from_mapping(workflow.policy)
     results: dict[str, Result] = {}
+    workflow_execution_id = _workflow_execution_id(workflow, policy)
     sequence = 0
 
     def notify(event_type: EventType, task_id: str | None = None, result: Result | None = None) -> None:
@@ -387,10 +480,22 @@ def execute_workflow(
         if isinstance(scheduler, AsyncScheduler):
             raise TypeError("use execute_workflow_async() with AsyncScheduler")
         if isinstance(scheduler, ProcessScheduler):
-            run_task = functools.partial(_execute_process_task, policy=policy)
+            run_task = functools.partial(
+                _execute_process_task,
+                policy=policy,
+                workflow_id=workflow.id,
+                workflow_execution_id=workflow_execution_id,
+            )
         else:
             run_task = lambda task, dependencies: _execute_task(
-                task, machine, dependencies, policy, cache
+                task,
+                machine,
+                dependencies,
+                policy,
+                cache,
+                workflow_id=workflow.id,
+                workflow_execution_id=workflow_execution_id,
+                artifact_store=artifact_store,
             )
         results.update(
             scheduler.execute(
@@ -410,6 +515,18 @@ def execute_workflow(
                 fail_fast=policy.failure.mode == "fail_fast",
             )
         )
+        if isinstance(scheduler, ProcessScheduler) and artifact_store is not None:
+            results = {
+                task_id: _finalize_result(
+                    result,
+                    workflow_id=workflow.id,
+                    execution_id_value=workflow_execution_id,
+                    task_id=task_id,
+                    attempt_id=result.attempt_id or result.metadata.get("attempt_id"),
+                    artifact_store=artifact_store,
+                )
+                for task_id, result in results.items()
+            }
         notify(EventType.WORKFLOW_COMPLETED)
         return results
 
@@ -436,6 +553,9 @@ def execute_workflow(
             {dependency: results[dependency] for dependency in task.dependencies},
             policy,
             cache,
+            workflow_id=workflow.id,
+            workflow_execution_id=workflow_execution_id,
+            artifact_store=artifact_store,
         )
         results[task.id] = result
         notify(
@@ -463,9 +583,21 @@ def _execute_process_task(
     task: Task,
     dependency_results: Mapping[str, Result],
     policy: ExecutionPolicy,
+    *,
+    workflow_id: str,
+    workflow_execution_id: str | None,
 ) -> Result:
     """Process-safe callback; no live machine, observer, or cache crosses the boundary."""
-    return _execute_task(task, LocalMachine(), dependency_results, policy, None)
+    return _execute_task(
+        task,
+        LocalMachine(),
+        dependency_results,
+        policy,
+        None,
+        workflow_id=workflow_id,
+        workflow_execution_id=workflow_execution_id,
+        artifact_store=None,
+    )
 
 
 async def execute_workflow_async(
@@ -475,12 +607,14 @@ async def execute_workflow_async(
     observers: tuple[Observer, ...] = (),
     cache: Cache | None = None,
     machine: LocalMachine | None = None,
+    artifact_store: ArtifactStore | None = None,
 ) -> dict[str, Result]:
     """Execute a workflow with bounded asyncio concurrency."""
     scheduler = scheduler or AsyncScheduler()
     policy = policy or ExecutionPolicy.from_mapping(workflow.policy)
     machine = machine or LocalMachine()
     results: dict[str, Result] = {}
+    workflow_execution_id = _workflow_execution_id(workflow, policy)
     sequence = 0
 
     def notify(event_type: EventType, task_id: str | None = None, result: Result | None = None) -> None:
@@ -504,9 +638,30 @@ async def execute_workflow_async(
             if inspect.isawaitable(value):
                 value = await value
             if isinstance(value, Result):
-                return value
-            return Result(status=ProcessStatus.FAILED, error="task operation must return a Result")
-        return _execute_task(task, machine, dependencies, policy, cache)
+                result = value
+            else:
+                result = Result(
+                    status=ProcessStatus.FAILED,
+                    error="task operation must return a Result",
+                )
+            return _finalize_result(
+                result,
+                workflow_id=workflow.id,
+                execution_id_value=workflow_execution_id,
+                task_id=task.id,
+                attempt_id=result.metadata.get("attempt_id", f"{task.id}:1"),
+                artifact_store=artifact_store,
+            )
+        return _execute_task(
+            task,
+            machine,
+            dependencies,
+            policy,
+            cache,
+            workflow_id=workflow.id,
+            workflow_execution_id=workflow_execution_id,
+            artifact_store=artifact_store,
+        )
 
     notify(EventType.WORKFLOW_STARTED)
     results.update(await scheduler.execute(

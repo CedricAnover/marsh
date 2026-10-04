@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping, Protocol, Sequence, runtime_checkable
 
+from marsh.core.artifacts import Artifact
+
 
 class ProcessStatus(str, Enum):
     CREATED = "created"
@@ -98,6 +100,13 @@ class Result:
     error: str | None = None
     duration: float | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    execution_id: str | None = None
+    attempt_id: str | None = None
+    artifact_refs: tuple[Artifact, ...] = ()
+    provenance: Mapping[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "artifact_refs", tuple(self.artifact_refs))
 
     @property
     def ok(self) -> bool:
