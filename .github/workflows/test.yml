@@ -4,7 +4,7 @@ on:
   push:
     branches: ["*"]
   pull_request:
-    branches: ["main"]
+    branches: ["develop", "main"]
   workflow_dispatch:
 
 permissions:
@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v10.2.0
@@ -27,7 +27,6 @@ jobs:
         run: |
           uv sync --all-groups
 
-      # TODO: Setup Docker for testing docker components (and possible ssh components).
       - name: Run pytest
         run: |
           cd src
@@ -45,3 +44,49 @@ jobs:
         with:
             coverageFile: coverage.xml
             token: ${{ secrets.GITHUB_TOKEN }}
+
+  windows_portability:
+    name: Windows portability (Python 3.12)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Run portable pytest suite
+        run: >
+          uv run pytest -vv --disable-warnings --tb=short
+          --ignore=tests/bash
+          --ignore=tests/docker
+          --ignore=tests/ssh
+          tests/
+
+  docker_integration:
+    name: Docker integration (Ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Pull Docker integration images
+        run: |
+          docker pull bash:latest
+          docker pull ubuntu:24.04
+
+      - name: Run Docker integration tests
+        run: uv run pytest -vv --disable-warnings --tb=short tests/docker
