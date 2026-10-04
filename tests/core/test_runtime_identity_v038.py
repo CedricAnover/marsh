@@ -5,6 +5,10 @@ from marsh.core.policies import ExecutionPolicy, RetryPolicy
 from marsh.core.runtime import execute_workflow
 
 
+def emit_payload(inputs, dependencies):
+    return Result(stdout=b"payload")
+
+
 def test_retry_keeps_execution_identity_but_changes_attempt_identity(tmp_path):
     calls = []
 
@@ -63,7 +67,7 @@ def test_artifact_reference_can_be_verified_from_provenance(tmp_path):
     store = LocalArtifactStore(tmp_path)
     workflow = Workflow(
         id="artifact",
-        tasks=(Task(id="task", operation=lambda *_: Result(stdout=b"payload")),),
+        tasks=(Task(id="task", operation=emit_payload),),
     )
 
     result = execute_workflow(workflow, artifact_store=store)["task"]
