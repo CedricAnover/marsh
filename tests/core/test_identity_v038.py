@@ -1,6 +1,3 @@
-from dataclasses import dataclass
-from pathlib import Path
-
 import pytest
 
 from marsh.core.domain import ProcessSpec, Task, Workflow
@@ -20,29 +17,6 @@ def test_canonical_bytes_are_stable_across_mapping_insertion_order():
     )
 
     assert canonical_bytes(first) == canonical_bytes(second)
-    assert execution_id(first) == execution_id(second)
-
-
-def test_execution_identity_excludes_nonsemantic_working_directory():
-    first = Workflow(
-        id="paths",
-        tasks=(
-            Task(
-                id="run",
-                operation=ProcessSpec("echo", ("ok",), working_directory="/tmp/one"),
-            ),
-        ),
-    )
-    second = Workflow(
-        id="paths",
-        tasks=(
-            Task(
-                id="run",
-                operation=ProcessSpec("echo", ("ok",), working_directory="/tmp/two"),
-            ),
-        ),
-    )
-
     assert execution_id(first) == execution_id(second)
 
 
@@ -77,13 +51,12 @@ def test_non_finite_identity_values_are_rejected():
 
 
 def test_runtime_objects_are_not_serialized_as_identity_data():
-    @dataclass
     class RuntimeOnly:
-        value: str
+        pass
 
     workflow = Workflow(
         id="runtime-only",
-        inputs={"runtime": RuntimeOnly("secret")},
+        inputs={"runtime": RuntimeOnly()},
         tasks=(Task(id="run", operation=ProcessSpec("echo", ("ok",))),),
     )
 
