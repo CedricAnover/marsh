@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-from marsh.core.domain import ProcessSpec, ProcessStatus, Result, Workflow, Task
+from marsh.core.domain import ProcessSpec, ProcessStatus, Workflow, Task
 from marsh.core.providers import (
     LocalProvider,
     Provider,
@@ -70,3 +70,27 @@ def test_provider_is_a_mechanism_boundary():
 def test_local_provider_options_are_rejected():
     with pytest.raises(ProviderConfigurationError, match="unsupported local provider options"):
         LocalProvider().create_machine(region="test")
+
+
+def test_unknown_provider_is_rejected_at_resolution_boundary():
+    with pytest.raises(KeyError):
+        ProviderRegistry({"local": LocalProvider()}).resolve(ProviderConfig("missing"))
+
+
+def test_machine_and_provider_are_mutually_exclusive():
+    workflow = Workflow(
+        id="exclusive-selection",
+        tasks=(
+            Task(
+                id="run",
+                operation=lambda inputs, dependencies: None,
+            ),
+        ),
+    )
+    with pytest.raises(ValueError, match="cannot both be supplied"):
+        execute_workflow(
+            workflow,
+            machine=LocalProvider().create_machine(),
+            provider=ProviderConfig("local"),
+            provider_registry=ProviderRegistry({"local": LocalProvider()}),
+        )
