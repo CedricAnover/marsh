@@ -20,7 +20,7 @@ from marsh.core.domain import (
     can_transition,
 )
 from marsh.core.observability import EventType, Observer, RuntimeEvent, emit_event
-from marsh.core.policies import ExecutionPolicy
+from marsh.core.policies import ExecutionPolicy, evaluate_policy
 from marsh.core.scheduler import AsyncScheduler, ProcessScheduler, ThreadScheduler
 
 
@@ -79,6 +79,7 @@ class LocalProcess:
         self._result: Result | None = None
         self._cancelled = False
         self._started_at: float | None = None
+        self._cancel_requested = False
 
     @property
     def status(self) -> ProcessStatus:
@@ -151,9 +152,11 @@ class LocalProcess:
         self._terminate(ProcessStatus.CANCELLED, force=True)
 
     def cancel(self) -> None:
+        """Request cancellation; wait() confirms the terminal outcome."""
+        self._cancel_requested = True
         if self._status is ProcessStatus.CREATED:
             self._transition(ProcessStatus.CANCELLED)
-            self._result = Result(status=ProcessStatus.CANCELLED)
+            self._result = Result(status=ProcessStatus.CANCELLED, metadata={"cancellation": "confirmed"})
             return
         self._terminate(ProcessStatus.CANCELLED)
 
@@ -185,7 +188,7 @@ class LocalProcess:
             self._transition(ProcessStatus.TIMED_OUT)
             self._process.kill()
             stdout, stderr = self._process.communicate()
-            return self._finish(stdout, stderr, None, ProcessStatus.TIMED_OUT, "process timed out")
+            return self._finish(stdout, stderr, self._process.returncode, ProcessStatus.TIMED_OUT, "process timed out")
 
         status = (
             ProcessStatus.CANCELLED
@@ -252,18 +255,18 @@ def _execute_task(
 ) -> Result:
     operation = task.operation
     started_at = time.monotonic()
+    idempotent = bool(task.metadata.get("idempotent", True))
+    cleanup = task.metadata.get("cleanup")
+    if cleanup is not None and not callable(cleanup):
+        raise TypeError("task cleanup must be callable when provided")
 
     cache_key = None
     if policy.cache.enabled and cache is not None:
-        cache_key = cache_key_for_task(
-            task,
-            dependency_results,
-            namespace=policy.cache.namespace,
-        )
+        cache_key = cache_key_for_task(task, dependency_results, namespace=policy.cache.namespace)
         if cache_key is not None:
             cached = cache.get(cache_key)
             if cached is not None and cached.ok:
-                return cached
+                return replace(cached, metadata={**cached.metadata, "cached": True, "attempt": 0})
 
     if policy.resources is not None:
         requested = task.metadata.get("resources", {})
@@ -274,48 +277,69 @@ def _execute_task(
                 duration=time.monotonic() - started_at,
             )
 
+    def run_cleanup(attempt: int) -> tuple[bool, str | None]:
+        if cleanup is None or not policy.cleanup.enabled:
+            return True, None
+        try:
+            cleanup(task, attempt)
+            return True, None
+        except Exception as exc:
+            return False, str(exc)
+
+    def finish_attempt(result: Result, attempt: int) -> Result | None:
+        cleanup_ok, cleanup_error = run_cleanup(attempt)
+        decision = evaluate_policy(
+            policy,
+            result,
+            attempt=attempt,
+            idempotent=idempotent,
+            cleanup_succeeded=cleanup_ok,
+        )
+        metadata = {
+            **result.metadata,
+            "attempt": attempt,
+            "attempt_id": f"{task.id}:{attempt}",
+            "failure_class": decision.failure_class.value,
+            "cleanup_succeeded": cleanup_ok,
+        }
+        if cleanup_error is not None:
+            metadata["cleanup_error"] = cleanup_error
+        result = replace(result, metadata=metadata)
+        return None if decision.retry else result
+
     if isinstance(operation, ProcessSpec):
         if policy.timeout is not None:
-            operation = replace(
-                operation,
-                timeout=policy.timeout.resolve(operation.timeout),
-            )
-        attempts = 0
+            operation = replace(operation, timeout=policy.timeout.resolve(operation.timeout))
+        attempt = 0
         while True:
-            attempts += 1
+            attempt += 1
             process = machine.create_process(operation)
             process.start()
             result = process.wait()
-            if not policy.retry.should_retry(result, attempts):
-                return result
+            final = finish_attempt(result, attempt)
+            if final is not None:
+                return final
 
     if callable(operation):
-        attempts = 0
+        attempt = 0
         while True:
-            attempts += 1
+            attempt += 1
             try:
                 result = operation(task.inputs, dependency_results)
             except Exception as exc:
-                result = Result(
-                    status=ProcessStatus.FAILED,
-                    error=str(exc),
-                    duration=time.monotonic() - started_at,
-                )
+                result = Result(status=ProcessStatus.FAILED, error=str(exc), duration=time.monotonic() - started_at)
             if not isinstance(result, Result):
-                result = Result(
-                    status=ProcessStatus.FAILED,
-                    error="task operation must return a Result",
-                    duration=time.monotonic() - started_at,
-                )
-            if not policy.retry.should_retry(result, attempts):
-                return result
+                result = Result(status=ProcessStatus.FAILED, error="task operation must return a Result")
+            final = finish_attempt(result, attempt)
+            if final is not None:
+                return final
 
     return Result(
         status=ProcessStatus.FAILED,
         error=f"unsupported task operation: {type(operation).__name__}",
         duration=time.monotonic() - started_at,
+        metadata={"attempt": 0, "attempt_id": f"{task.id}:0"},
     )
-
 
 def execute_workflow(
     workflow: Workflow,
