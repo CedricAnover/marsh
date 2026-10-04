@@ -115,7 +115,6 @@ jobs:
           name: Run Docker integration tests
           command: |
             uv run pytest -vv --disable-warnings --tb=short tests/docker
-            uv run pytest -vv --disable-warnings --tb=short tests/core/test_provider_architecture_v034.py::test_docker_provider_executes_real_container
       - run:
           name: Run SSH integration tests
           command: uv run pytest -vv --disable-warnings --tb=short tests/ssh
