@@ -376,7 +376,7 @@ def execute_workflow(
             workflow_id=workflow.id,
             task_id=task_id,
             status=result.status if result is not None else None,
-            metadata={"duration": result.duration} if result is not None else {},
+            metadata=(dict(result.metadata) | {"duration": result.duration}) if result is not None else {},
         )
         for observer in observers:
             emit_event(observer, event)
@@ -398,7 +398,7 @@ def execute_workflow(
                 run_task,
                 on_start=lambda task_id: notify(EventType.TASK_STARTED, task_id),
                 on_complete=lambda task_id, result: notify(
-                    EventType.TASK_FAILED if result.failed else EventType.TASK_COMPLETED,
+                    EventType.TASK_TIMED_OUT if result.status is ProcessStatus.TIMED_OUT else EventType.TASK_CANCELLED if result.status is ProcessStatus.CANCELLED else EventType.TASK_FAILED if result.failed else EventType.TASK_COMPLETED,
                     task_id,
                     result,
                 ),
