@@ -61,7 +61,7 @@ class RetryPolicy:
             return FailureClass.CANCELLED
         if result.status is not ProcessStatus.FAILED:
             return FailureClass.UNKNOWN
-        value = str(result.metadata.get("failure_class", FailureClass.UNKNOWN.value))
+        value = str(result.metadata.get("failure_class", FailureClass.TRANSIENT.value))
         try:
             return FailureClass(value)
         except ValueError:
