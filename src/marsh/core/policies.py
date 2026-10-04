@@ -170,6 +170,93 @@ class ExecutionPolicy:
     restart: RestartPolicy = RestartPolicy()
     scheduling: SchedulingPolicy = SchedulingPolicy()
 
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any] | None) -> "ExecutionPolicy":
+        data = dict(value or {})
+        unknown = set(data) - {
+            "retry", "timeout", "resources", "failure", "cache",
+            "cleanup", "cancellation", "restart", "scheduling",
+        }
+        if unknown:
+            names = ", ".join(sorted(unknown))
+            raise ValueError(f"unknown policy fields: {names}")
+
+        retry_data = dict(data.get("retry") or {})
+        retry = RetryPolicy(
+            max_attempts=int(retry_data.get("max_attempts", 1)),
+            backoff=float(retry_data.get("backoff", 0.0)),
+            allow_non_idempotent=bool(retry_data.get("allow_non_idempotent", False)),
+        )
+        timeout_data = data.get("timeout")
+        timeout = None if timeout_data is None else TimeoutPolicy(float(
+            timeout_data.get("timeout") if isinstance(timeout_data, Mapping) else timeout_data
+        ))
+        resources_data = data.get("resources")
+        resources = None if resources_data is None else ResourcePolicy(dict(resources_data.get("available", resources_data)))
+        failure_data = data.get("failure")
+        failure = FailurePolicy(str(failure_data.get("mode", "skip_dependents") if isinstance(failure_data, Mapping) else failure_data))
+        cache_data = data.get("cache")
+        cache = CachePolicy(
+            enabled=bool(cache_data.get("enabled", False) if isinstance(cache_data, Mapping) else cache_data or False),
+            namespace=str(cache_data.get("namespace", "marsh") if isinstance(cache_data, Mapping) else "marsh"),
+        )
+        cleanup_data = data.get("cleanup") or {}
+        cancellation_data = data.get("cancellation") or {}
+        restart_data = data.get("restart") or {}
+        scheduling_data = data.get("scheduling") or {}
+        return cls(
+            retry=retry,
+            timeout=timeout,
+            resources=resources,
+            failure=failure,
+            cache=cache,
+            cleanup=CleanupPolicy(
+                enabled=bool(cleanup_data.get("enabled", True)),
+                block_retry_on_failure=bool(cleanup_data.get("block_retry_on_failure", True)),
+            ),
+            cancellation=CancellationPolicy(
+                enabled=bool(cancellation_data.get("enabled", True)),
+                retry_cancelled=bool(cancellation_data.get("retry_cancelled", False)),
+            ),
+            restart=RestartPolicy(
+                enabled=bool(restart_data.get("enabled", False)),
+                max_restarts=int(restart_data.get("max_restarts", 0)),
+            ),
+            scheduling=SchedulingPolicy(
+                priority=int(scheduling_data.get("priority", 0)),
+                fail_fast=bool(scheduling_data.get("fail_fast", False)),
+            ),
+        )
+
+    def to_mapping(self) -> dict[str, Any]:
+        return {
+            "retry": {
+                "max_attempts": self.retry.max_attempts,
+                "backoff": self.retry.backoff,
+                "allow_non_idempotent": self.retry.allow_non_idempotent,
+            },
+            "timeout": None if self.timeout is None else {"timeout": self.timeout.timeout},
+            "resources": None if self.resources is None else {"available": dict(self.resources.available)},
+            "failure": {"mode": self.failure.mode},
+            "cache": {"enabled": self.cache.enabled, "namespace": self.cache.namespace},
+            "cleanup": {
+                "enabled": self.cleanup.enabled,
+                "block_retry_on_failure": self.cleanup.block_retry_on_failure,
+            },
+            "cancellation": {
+                "enabled": self.cancellation.enabled,
+                "retry_cancelled": self.cancellation.retry_cancelled,
+            },
+            "restart": {
+                "enabled": self.restart.enabled,
+                "max_restarts": self.restart.max_restarts,
+            },
+            "scheduling": {
+                "priority": self.scheduling.priority,
+                "fail_fast": self.scheduling.fail_fast,
+            },
+        }
+
 
 @dataclass(frozen=True)
 class PolicyDecision:
