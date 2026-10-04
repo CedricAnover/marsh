@@ -483,7 +483,14 @@ def execute_workflow(
             run_task = functools.partial(_execute_process_task, policy=policy)
         else:
             run_task = lambda task, dependencies: _execute_task(
-                task, machine, dependencies, policy, cache
+                task,
+                machine,
+                dependencies,
+                policy,
+                cache,
+                workflow_id=workflow.id,
+                workflow_execution_id=workflow_execution_id,
+                artifact_store=artifact_store,
             )
         results.update(
             scheduler.execute(
@@ -503,7 +510,7 @@ def execute_workflow(
                 fail_fast=policy.failure.mode == "fail_fast",
             )
         )
-        if isinstance(scheduler, ProcessScheduler) and artifact_store is not None:
+        if isinstance(scheduler, ProcessScheduler):
             results = {
                 task_id: _finalize_result(
                     result,
