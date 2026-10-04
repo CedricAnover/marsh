@@ -378,6 +378,11 @@ def execute_workflow(
                     task_id,
                     result,
                 ),
+                on_blocked=lambda task_id, result: notify(
+                    EventType.TASK_SKIPPED,
+                    task_id,
+                    result,
+                ),
                 fail_fast=policy.failure.mode == "fail_fast",
             )
         )
@@ -489,6 +494,12 @@ async def execute_workflow_async(
             task_id,
             result,
         ),
+        on_blocked=lambda task_id, result: notify(
+            EventType.TASK_SKIPPED,
+            task_id,
+            result,
+        ),
+        fail_fast=policy.failure.mode == "fail_fast",
     ))
     notify(EventType.WORKFLOW_COMPLETED)
     return results
