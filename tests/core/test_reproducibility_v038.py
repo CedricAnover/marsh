@@ -4,9 +4,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 
 from marsh.core.artifact_store import LocalArtifactStore
-from marsh.core.artifacts import Artifact
 from marsh.core.domain import ProcessSpec, Task, Workflow
-from marsh.core.identity import execution_id
 
 
 def test_execution_identity_is_stable_across_fresh_processes():
