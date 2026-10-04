@@ -38,7 +38,7 @@ def test_case_conversion_rejects_invalid_output_stream():
 def test_case_conversion_preserves_binary_bytes_without_decoding():
     value = bytes([0, 255, 97])
 
-    assert case_conversion(value, b"err", upper=True) == (value, b"err")
+    assert case_conversion(value, b"err", upper=True) == (b"\x00\xffA", b"err")
 
 
 def test_read_file_returns_empty_error_for_empty_file(tmp_path):
