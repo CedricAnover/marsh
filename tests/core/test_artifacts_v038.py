@@ -6,8 +6,8 @@ from marsh.core.artifacts import Artifact, Provenance
 from marsh.core.artifact_store import LocalArtifactStore
 
 
-def test_artifact_identity_is_content_addressed():
-    store = LocalArtifactStore()
+def test_artifact_identity_is_content_addressed(tmp_path):
+    store = LocalArtifactStore(tmp_path)
     first = store.put(b"hello", media_type="text/plain")
     second = store.put(b"hello", media_type="application/octet-stream")
 
