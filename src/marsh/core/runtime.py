@@ -496,6 +496,18 @@ def execute_workflow(
                 fail_fast=policy.failure.mode == "fail_fast",
             )
         )
+        if isinstance(scheduler, ProcessScheduler) and artifact_store is not None:
+            results = {
+                task_id: _finalize_result(
+                    result,
+                    workflow_id=workflow.id,
+                    execution_id_value=workflow_execution_id,
+                    task_id=task_id,
+                    attempt_id=result.attempt_id or result.metadata.get("attempt_id"),
+                    artifact_store=artifact_store,
+                )
+                for task_id, result in results.items()
+            }
         notify(EventType.WORKFLOW_COMPLETED)
         return results
 
@@ -577,12 +589,14 @@ async def execute_workflow_async(
     observers: tuple[Observer, ...] = (),
     cache: Cache | None = None,
     machine: LocalMachine | None = None,
+    artifact_store: ArtifactStore | None = None,
 ) -> dict[str, Result]:
     """Execute a workflow with bounded asyncio concurrency."""
     scheduler = scheduler or AsyncScheduler()
     policy = policy or ExecutionPolicy.from_mapping(workflow.policy)
     machine = machine or LocalMachine()
     results: dict[str, Result] = {}
+    workflow_execution_id = execution_id(workflow, policy=policy.to_mapping())
     sequence = 0
 
     def notify(event_type: EventType, task_id: str | None = None, result: Result | None = None) -> None:
@@ -606,9 +620,30 @@ async def execute_workflow_async(
             if inspect.isawaitable(value):
                 value = await value
             if isinstance(value, Result):
-                return value
-            return Result(status=ProcessStatus.FAILED, error="task operation must return a Result")
-        return _execute_task(task, machine, dependencies, policy, cache)
+                result = value
+            else:
+                result = Result(
+                    status=ProcessStatus.FAILED,
+                    error="task operation must return a Result",
+                )
+            return _finalize_result(
+                result,
+                workflow_id=workflow.id,
+                execution_id_value=workflow_execution_id,
+                task_id=task.id,
+                attempt_id=result.metadata.get("attempt_id", f"{task.id}:1"),
+                artifact_store=artifact_store,
+            )
+        return _execute_task(
+            task,
+            machine,
+            dependencies,
+            policy,
+            cache,
+            workflow_id=workflow.id,
+            workflow_execution_id=workflow_execution_id,
+            artifact_store=artifact_store,
+        )
 
     notify(EventType.WORKFLOW_STARTED)
     results.update(await scheduler.execute(
