@@ -48,5 +48,3 @@ class WorkflowDocument:
     def __post_init__(self) -> None:
         if self.schema.get("name") != IR_NAME:
             raise ValueError(f"unsupported schema name: {self.schema.get('name')!r}")
-        if self.schema.get("version") != IR_VERSION:
-            raise ValueError(f"unsupported schema version: {self.schema.get('version')!r}")

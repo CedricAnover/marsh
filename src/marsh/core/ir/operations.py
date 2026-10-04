@@ -18,8 +18,9 @@ def operation_to_ref(operation: Any) -> OperationRef:
     if not module or not qualname:
         raise OperationResolutionError("callable does not expose module/qualname")
     if module == "__main__" or "<locals>" in qualname or qualname == "<lambda>":
-        raise OperationResolutionError(
-            "callable must be a top-level importable function outside __main__"
+        raise TypeError(
+            "operation is not serializable: callable must be a top-level "
+            "importable function outside __main__"
         )
     return OperationRef("python_callable", module, qualname)
 
