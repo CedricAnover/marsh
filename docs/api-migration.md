@@ -198,7 +198,28 @@ round_trip = workflow_from_json(payload)
 
 Portable JSON definitions should contain serializable values. Arbitrary Python callables are Python objects and are not general portable JSON definitions.
 
-## 10. Deprecation discipline
+
+## 10. Artifacts, identity, and provenance
+
+v0.3.8 adds identity and artifact fields additively to canonical Result values:
+
+    result.execution_id
+    result.attempt_id
+    result.artifact_refs
+    result.provenance
+
+Existing code that only reads stdout, stderr, status, error, duration, or metadata does not need to change.
+
+For portable workflows, execution_id is deterministic across fresh processes. Retry attempts keep the same execution identity while receiving a distinct attempt identity. Cache hits reuse the successful cached result rather than creating another attempt.
+
+Artifact persistence is opt-in:
+
+    store = LocalArtifactStore(".marsh-artifacts")
+    results = execute_workflow(workflow, artifact_store=store)
+
+Applications that require portability should avoid arbitrary local/lambda callables in workflow definitions. Legacy callable workflows remain supported, but the runtime does not invent a portable execution identity for definitions that cannot cross the canonical serialization boundary.
+
+## 11. Deprecation discipline
 
 The v0.3.x compatibility policy is deliberately conservative:
 
@@ -211,7 +232,7 @@ The v0.3.x compatibility policy is deliberately conservative:
 
 This policy keeps application migrations incremental while the workflow kernel continues to converge.
 
-## 11. Further reading
+## 12. Further reading
 
 - [Workflow Guide](workflow-guide.md) — canonical examples and workflow semantics.
 - [Architecture](architecture.md) — implemented architecture and boundaries.
