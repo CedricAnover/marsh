@@ -130,16 +130,13 @@ class DockerProcess:
             )
             return self._result
         except Exception as exc:
-            from requests.exceptions import ReadTimeout
-
-            if isinstance(exc, ReadTimeout):
+            if exc.__class__.__name__ == "ReadTimeout":
                 self._transition(ProcessStatus.TIMED_OUT)
                 self._result = Result(
                     status=ProcessStatus.TIMED_OUT,
                     error="process timed out",
                 )
                 return self._result
-        except Exception as exc:
             if self._status is ProcessStatus.RUNNING:
                 self._transition(ProcessStatus.FAILED)
             self._result = Result(status=ProcessStatus.FAILED, error=str(exc))
