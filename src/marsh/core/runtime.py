@@ -266,7 +266,7 @@ def _execute_task(
         if cache_key is not None:
             cached = cache.get(cache_key)
             if cached is not None and cached.ok:
-                return replace(cached, metadata={**cached.metadata, "cached": True, "attempt": 0})
+                return cached
 
     if policy.resources is not None:
         requested = task.metadata.get("resources", {})
