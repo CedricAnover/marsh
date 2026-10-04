@@ -9,8 +9,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Awaitable, Callable, Mapping
 
-from marsh.core.domain import Result, Task, Workflow
-from marsh.core.policies import ExecutionPolicy
+from marsh.core.domain import ProcessStatus, Result, Task, Workflow
 
 
 class TaskState(str, Enum):
@@ -130,6 +129,9 @@ class ConcurrentScheduler:
             for task in workflow.tasks:
                 if state.states[task.id] is TaskState.READY:
                     state.states[task.id] = TaskState.CANCELLED
+                    state.results[task.id] = Result(status=ProcessStatus.CANCELLED)
+                    if on_start is not None:
+                        on_start(task.id)
             return []
         capacity = self.max_concurrency - running
         dispatch = self._ready_tasks(workflow, state)[: max(0, capacity)]
@@ -196,15 +198,26 @@ class AsyncScheduler(ConcurrentScheduler):
                     self._cancel_requested = True
 
             if self._cancel_requested and running:
-                for future in running:
-                    future.cancel()
-                done, _ = await asyncio.wait(tuple(running))
-                for future in done:
-                    task_id = running.pop(future)
-                    if state.states[task_id] is TaskState.RUNNING:
-                        from marsh.core.domain import ProcessStatus
-
+                pending = []
+                for future, task_id in list(running.items()):
+                    if future.cancel():
+                        running.pop(future)
                         result = Result(status=ProcessStatus.CANCELLED)
+                        state.mark_completed(task_id, result)
+                        if on_complete is not None:
+                            on_complete(task_id, result)
+                    else:
+                        pending.append(future)
+                if pending:
+                    done, _ = await asyncio.wait(tuple(pending))
+                    for future in sorted(done, key=lambda item: running[item]):
+                        task_id = running.pop(future)
+                        try:
+                            result = future.result()
+                        except asyncio.CancelledError:
+                            result = Result(status=ProcessStatus.CANCELLED)
+                        except Exception as exc:
+                            result = Result(status=ProcessStatus.FAILED, error=str(exc))
                         state.mark_completed(task_id, result)
                         if on_complete is not None:
                             on_complete(task_id, result)
