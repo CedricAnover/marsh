@@ -86,7 +86,7 @@ jobs:
             command -v uv
       - run:
           name: Install dependencies
-          command: uv sync --all-groups
+          command: uv sync --all-groups --extra docker --extra ssh
       - run:
           name: Validate dependency and platform contract
           command: |
@@ -97,9 +97,14 @@ jobs:
 
             assert sys.version_info[:2] == (3, 12), sys.version
             project = tomllib.loads(Path("pyproject.toml").read_text())["project"]
-            assert "optional-dependencies" not in project, "Unexpected optional dependency surface"
+            extras = project["optional-dependencies"]
+            dependencies = project["dependencies"]
+            assert not any(dep.startswith("docker") for dep in dependencies)
+            assert not any(dep.startswith("fabric") for dep in dependencies)
+            assert any(dep.startswith("docker") for dep in extras["docker"])
+            assert any(dep.startswith("fabric") for dep in extras["ssh"])
             assert project["requires-python"] == ">=3.10,<3.13"
-            print("Python 3.12 integration environment validated; optional dependency surface is N/A.")
+            print("Python 3.12 integration environment and optional provider dependency contract validated.")
             PY
       - run:
           name: Pull Docker integration test images
@@ -108,7 +113,9 @@ jobs:
             docker pull ubuntu:24.04
       - run:
           name: Run Docker integration tests
-          command: uv run pytest -vv --disable-warnings --tb=short tests/docker
+          command: |
+            uv run pytest -vv --disable-warnings --tb=short tests/docker
+            uv run pytest -vv --disable-warnings --tb=short tests/core/test_provider_architecture_v034.py::test_docker_provider_executes_real_container
       - run:
           name: Run SSH integration tests
           command: uv run pytest -vv --disable-warnings --tb=short tests/ssh

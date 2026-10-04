@@ -1,15 +1,26 @@
-"""Provider discovery and capability negotiation for Marsh."""
+"""Provider discovery, configuration, and capability negotiation for Marsh."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Iterable, Mapping, Protocol, runtime_checkable
 
-from marsh.core.domain import Machine, ProcessSpec
-from marsh.core.runtime import LocalMachine
+from marsh.core.domain import Machine
 
 
-class UnsupportedCapabilityError(ValueError):
+class ProviderError(RuntimeError):
+    """Base error for provider-boundary failures."""
+
+
+class ProviderConfigurationError(ProviderError, ValueError):
+    """Raised for invalid provider configuration."""
+
+
+class ProviderUnavailableError(ProviderError):
+    """Raised when a configured provider cannot be reached."""
+
+
+class UnsupportedCapabilityError(ProviderError, ValueError):
     """Raised when a provider cannot satisfy a required capability."""
 
 
@@ -33,6 +44,21 @@ class ProviderCapabilities:
 
     def satisfies(self, required: Iterable[str]) -> bool:
         return set(required).issubset(self.values)
+
+
+@dataclass(frozen=True)
+class ProviderConfig:
+    """Provider selection/configuration without provider-specific semantics."""
+
+    name: str
+    options: Mapping[str, object]
+
+    def __init__(self, name: str, options: Mapping[str, object] | None = None):
+        normalized = name.strip()
+        if not normalized:
+            raise ProviderConfigurationError("provider name must be non-empty")
+        object.__setattr__(self, "name", normalized)
+        object.__setattr__(self, "options", dict(options or {}))
 
 
 @runtime_checkable
@@ -68,14 +94,18 @@ class LocalProvider:
             }
         )
 
-    def create_machine(self, **kwargs) -> LocalMachine:
+    def create_machine(self, **kwargs) -> Machine:
+        from marsh.core.runtime import LocalMachine
+
         if kwargs:
-            raise TypeError(f"unsupported local provider options: {sorted(kwargs)}")
+            raise ProviderConfigurationError(
+                f"unsupported local provider options: {sorted(kwargs)}"
+            )
         return LocalMachine()
 
 
 class ProviderRegistry:
-    """Named provider registry with explicit capability negotiation."""
+    """Deterministic named provider registry with capability negotiation."""
 
     def __init__(self, providers: Mapping[str, Provider] | None = None):
         self._providers: dict[str, Provider] = {}
@@ -83,15 +113,19 @@ class ProviderRegistry:
             self.register(name, provider)
 
     def register(self, name: str, provider: Provider) -> None:
-        name = name.strip()
-        if not name:
-            raise ValueError("provider name must be non-empty")
-        if name in self._providers:
-            raise ValueError(f"provider {name!r} is already registered")
-        self._providers[name] = provider
+        config_name = name.strip()
+        if not config_name:
+            raise ProviderConfigurationError("provider name must be non-empty")
+        if config_name in self._providers:
+            raise ProviderConfigurationError(
+                f"provider {config_name!r} is already registered"
+            )
+        if not isinstance(provider, Provider):
+            raise TypeError("provider does not satisfy the Provider contract")
+        self._providers[config_name] = provider
 
     def get(self, name: str) -> Provider | None:
-        return self._providers.get(name)
+        return self._providers.get(name.strip())
 
     def find(self, capabilities: Iterable[str] = ()) -> tuple[tuple[str, Provider], ...]:
         required = frozenset(capabilities)
@@ -101,8 +135,12 @@ class ProviderRegistry:
             if self._providers[name].capabilities.satisfies(required)
         )
 
-    def require(self, name: str, capabilities: Iterable[str] = ()) -> Provider:
-        provider = self._providers.get(name)
+    def require(
+        self,
+        name: str,
+        capabilities: Iterable[str] = (),
+    ) -> Provider:
+        provider = self.get(name)
         if provider is None:
             raise KeyError(name)
         required = frozenset(capabilities)
@@ -112,3 +150,10 @@ class ProviderRegistry:
                 f"provider {name!r} does not support capabilities: {', '.join(missing)}"
             )
         return provider
+
+    def resolve(
+        self,
+        config: ProviderConfig,
+        capabilities: Iterable[str] = (),
+    ) -> Provider:
+        return self.require(config.name, capabilities)

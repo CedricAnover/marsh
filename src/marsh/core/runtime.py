@@ -21,6 +21,21 @@ from marsh.core.observability import EventType, Observer, RuntimeEvent, emit_eve
 from marsh.core.policies import ExecutionPolicy
 
 
+class _LocalProvider:
+    """Lazy local provider used only for runtime compatibility."""
+
+    @property
+    def capabilities(self):
+        from marsh.core.providers import LocalProvider
+
+        return LocalProvider().capabilities
+
+    def create_machine(self):
+        from marsh.core.providers import LocalProvider
+
+        return LocalProvider().create_machine()
+
+
 @dataclass(frozen=True)
 class ExecutionPlan:
     """Deterministic workflow order plus tasks initially ready to run."""
@@ -317,9 +332,20 @@ def execute_workflow(
     policy: ExecutionPolicy | None = None,
     observers: tuple[Observer, ...] = (),
     cache: Cache | None = None,
+    provider=None,
+    provider_registry=None,
 ) -> dict[str, Result]:
-    """Execute a workflow sequentially with explicit, composable policies."""
-    machine = machine or LocalMachine()
+    """Execute a workflow sequentially through a selected execution provider."""
+    if machine is not None and provider is not None:
+        raise ValueError("machine and provider cannot both be supplied")
+    if provider is not None:
+        from marsh.core.providers import ProviderConfig, ProviderRegistry
+
+        registry = provider_registry or ProviderRegistry({"local": _LocalProvider()})
+        config = provider if isinstance(provider, ProviderConfig) else ProviderConfig(str(provider))
+        machine = registry.resolve(config).create_machine(**dict(config.options))
+    else:
+        machine = machine or LocalMachine()
     scheduler = scheduler or SequentialScheduler()
     policy = policy or ExecutionPolicy()
     results: dict[str, Result] = {}
