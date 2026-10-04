@@ -116,6 +116,18 @@ class LocalArtifactStore:
         data = path.read_bytes()
         if len(data) != ref.size or content_digest(data) != ref.digest:
             raise ValueError("artifact integrity verification failed")
+        manifest_path = self.manifest_path_for(ref)
+        if manifest_path.is_file():
+            manifest = json.loads(
+                manifest_path.read_text(encoding="utf-8")
+            )
+            if (
+                manifest.get("digest") != ref.digest
+                or manifest.get("size") != ref.size
+            ):
+                raise ValueError(
+                    "artifact manifest integrity verification failed"
+                )
         return data
 
     def exists(self, ref: ArtifactRef) -> bool:
