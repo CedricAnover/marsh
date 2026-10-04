@@ -36,7 +36,7 @@ class CachePolicy:
     enabled: bool = False
     namespace: str = "marsh"
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not self.namespace.strip():
             raise ValueError("cache namespace must be non-empty")
 
