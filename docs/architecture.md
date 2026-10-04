@@ -150,3 +150,67 @@ The attempt lifecycle is: execute -> terminal outcome -> cleanup at most once ->
 Cancellation is a request followed by mechanism-specific stop/terminate/kill and confirmation. A cancellation request is not itself a confirmed CANCELLED result. Timeout cleanup completes before retry eligibility is evaluated.
 
 The policy evaluator is pure and inspectable. Backend differences must not change the policy decision for the same policy, task metadata, outcome, and control history. Runtime-only callbacks such as cleanup functions remain outside the portable IR serialization boundary.
+
+
+## Artifact and identity boundary (v0.3.8)
+
+v0.3.8 extends the existing canonical Workflow IR and runtime rather than introducing a second execution engine.
+
+```mermaid
+flowchart LR
+    W[Workflow / Task] --> C[Canonical IR]
+    C --> E[Execution identity]
+    E --> K[Opt-in cache]
+    W --> R[Existing runtime]
+    R --> A[Attempt identity]
+    R --> O[Result]
+    O --> S[ArtifactStore]
+    S --> AR[ArtifactRef]
+    O --> P[Provenance]
+    E --> P
+    A --> P
+    AR --> P
+```
+
+Plaintext contract:
+
+```text
+Workflow semantics
+    -> canonical UTF-8 representation
+    -> execution identity
+
+Existing scheduler / policy / provider path
+    -> attempt identity
+    -> Result
+
+Result bytes
+    -> SHA-256 content identity
+    -> local ArtifactStore (optional)
+    -> ArtifactRef
+
+Execution identity != attempt identity != artifact identity
+
+Provenance is allow-listed and serializable.
+Storage paths and runtime objects are not semantic identity.
+```
+
+### Identity layers
+
+- Execution identity: semantic fingerprint of a portable workflow execution.
+- Attempt identity: per-attempt runtime identity; retries receive distinct attempt IDs.
+- Artifact identity: SHA-256 of artifact bytes; independent of storage location.
+- Result: semantic outcome that may reference artifacts and provenance.
+
+### ArtifactStore boundary
+
+ArtifactStore is a narrow capability. LocalArtifactStore uses content-addressed paths, manifests, digest/size verification, secure temporary files, and atomic finalization. Remote object stores are not required by the canonical runtime.
+
+### Compatibility boundary
+
+Legacy callable workflows remain executable. When their definitions cannot be represented by the portable canonical IR, runtime identity is unavailable rather than fabricated from process-local object representations.
+
+The runtime accepts an optional ArtifactStore. Without one, existing result streams remain in memory and no artifact directory is required.
+
+### Security boundary
+
+Portable provenance is allow-listed. It must not contain credentials, full environment dumps, arbitrary runtime objects, or storage implementation details. Artifact reads verify content identity and declared size before returning bytes.
