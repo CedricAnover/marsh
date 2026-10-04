@@ -129,7 +129,10 @@ def test_docker_provider_executes_real_container():
 
 
 def test_provider_specific_dependencies_are_optional_extras():
-    import tomllib
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib
     from pathlib import Path
 
     project = tomllib.loads(Path("pyproject.toml").read_text())["project"]
