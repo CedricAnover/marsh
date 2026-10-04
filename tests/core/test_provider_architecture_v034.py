@@ -107,6 +107,7 @@ def test_docker_provider_implements_the_same_capability_contract():
     )
 
 
+@pytest.mark.integration
 def test_docker_provider_executes_real_container():
     from marsh.providers.docker_provider import DockerProvider
 
