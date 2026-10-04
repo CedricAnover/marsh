@@ -127,8 +127,20 @@ jobs:
               ],
               "ignore_labels": ["wip", "do-not-merge"],
               "sort": {"order": "ASC", "on_property": "mergedAt"},
+              "custom_placeholders": [
+                {
+                  "name": "SUMMARY",
+                  "source": "BODY",
+                  "transformer": {
+                    "pattern": "^[\\s\\S]*?## Summary\\s*\\n([\\s\\S]*?)(?:\\n## |$)",
+                    "target": "$1",
+                    "flags": "g",
+                    "on_empty": ""
+                  }
+                }
+              ],
               "template": "# Release Notes for #{{TO_TAG}}\n\n#{{CHANGELOG}}\n\n<details>\n<summary>Uncategorized</summary>\n\n#{{UNCATEGORIZED}}\n</details>",
-              "pr_template": "- #{{TITLE}} ([#{{NUMBER}}](#{{URL}})) by @#{{AUTHOR}}"
+              "pr_template": "- #{{TITLE}}\n  #{{SUMMARY}}\n  ([#{{NUMBER}}](#{{URL}})) by @#{{AUTHOR}}"
             }
           fetchReleaseInformation: true
           token: ${{ secrets.GITHUB_TOKEN }}
