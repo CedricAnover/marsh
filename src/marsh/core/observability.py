@@ -16,6 +16,9 @@ class EventType(str, Enum):
     TASK_COMPLETED = "task.completed"
     TASK_FAILED = "task.failed"
     TASK_SKIPPED = "task.skipped"
+    TASK_RETRY_SCHEDULED = "task.retry_scheduled"
+    TASK_CANCELLED = "task.cancelled"
+    TASK_TIMED_OUT = "task.timed_out"
 
 
 @dataclass(frozen=True)
