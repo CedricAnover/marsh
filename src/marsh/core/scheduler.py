@@ -322,7 +322,7 @@ class ProcessScheduler(ExecutorScheduler):
             raise TypeError("process scheduler requires a picklable task executor")
         return super().execute(
             workflow,
-            lambda task, dependencies: _run_process_task(task, dependencies, run_task),
+            run_task,
             on_start=on_start,
             on_complete=on_complete,
             fail_fast=fail_fast,
