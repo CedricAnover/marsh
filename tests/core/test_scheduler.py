@@ -146,7 +146,7 @@ def test_fail_fast_cancels_pending_work_but_does_not_claim_running_work_was_canc
 
     results = nonlocal_result[0]
     assert results["a"].failed
-    assert "c" not in results or results["c"].status is ProcessStatus.CANCELLED
+    assert results["c"].status is ProcessStatus.CANCELLED
     assert results["b"].ok
 
 
