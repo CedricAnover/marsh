@@ -105,3 +105,17 @@ def test_docker_provider_implements_the_same_capability_contract():
     assert provider.capabilities.satisfies(
         {"machine.create", "process.start", "process.wait", "process.result"}
     )
+
+
+def test_docker_provider_executes_real_container():
+    from marsh.providers.docker_provider import DockerProvider
+
+    process = DockerProvider(image="python:3.12-slim").create_machine().create_process(
+        ProcessSpec(executable="python", arguments=("-c", "print('docker-ok')"))
+    )
+    process.start()
+    result = process.wait()
+
+    assert result.status is ProcessStatus.COMPLETED
+    assert result.exit_code == 0
+    assert result.stdout.strip() == b"docker-ok"
