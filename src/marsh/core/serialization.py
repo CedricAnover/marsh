@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any, Mapping
 
 from marsh.core.configuration import normalize_workflow
@@ -42,9 +43,9 @@ def workflow_to_json(workflow: Workflow | Mapping[str, Any]) -> str:
 
 
 def workflow_from_dict(value: Mapping[str, Any]) -> Workflow:
-    """Reconstruct a runtime workflow from a canonical v1 document."""
+    """Reconstruct from a canonical document or normalize legacy authoring data."""
     if "schema" not in value:
-        raise ValueError("workflow document requires schema")
+        return normalize_workflow(value)
     document = WorkflowDocument(
         schema=dict(value["schema"]),
         workflow=dict(value["workflow"]),
@@ -54,7 +55,12 @@ def workflow_from_dict(value: Mapping[str, Any]) -> Workflow:
 
 
 def workflow_from_json(value: str) -> Workflow:
-    """Reconstruct a runtime workflow from canonical v1 JSON."""
+    """Reconstruct from canonical v1 JSON or normalize legacy JSON authoring data."""
+    raw = json.loads(value)
+    if not isinstance(raw, Mapping):
+        raise ValueError("workflow JSON must be an object")
+    if "schema" not in raw:
+        return normalize_workflow(raw)
     return document_to_workflow(document_from_json(value))
 
 
