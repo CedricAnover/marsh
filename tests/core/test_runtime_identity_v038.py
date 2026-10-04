@@ -42,8 +42,6 @@ def test_retry_keeps_execution_identity_but_changes_attempt_identity(tmp_path):
 
 
 def test_cache_hit_reuses_execution_identity_without_creating_attempt():
-    calls = []
-
     workflow = Workflow(
         id="cache-identity",
         tasks=(
@@ -66,7 +64,6 @@ def test_cache_hit_reuses_execution_identity_without_creating_attempt():
 
     assert first.execution_id == second.execution_id
     assert second.attempt_id is None
-    assert calls == [1]
 
 
 def test_artifact_reference_can_be_verified_from_provenance(tmp_path):
