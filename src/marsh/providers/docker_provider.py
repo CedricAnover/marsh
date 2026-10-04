@@ -101,7 +101,8 @@ class DockerProcess:
             return Result(status=self._status, error="process was not started")
         try:
             status_code = self._container.wait(timeout=self.spec.timeout)["StatusCode"]
-            output = self._container.logs()
+            stdout = self._container.logs(stdout=True, stderr=False)
+            stderr = self._container.logs(stdout=False, stderr=True)
             status = (
                 ProcessStatus.COMPLETED
                 if status_code == 0
@@ -114,10 +115,18 @@ class DockerProcess:
             )
             self._transition(status)
             self._result = Result(
-                stdout=output,
+                stdout=stdout,
+                stderr=stderr,
                 exit_code=status_code,
                 status=status,
                 error=error,
+            )
+            return self._result
+        except TimeoutError:
+            self._transition(ProcessStatus.TIMED_OUT)
+            self._result = Result(
+                status=ProcessStatus.TIMED_OUT,
+                error="process timed out",
             )
             return self._result
         except Exception as exc:
