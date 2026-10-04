@@ -439,43 +439,48 @@ def test_pyinterpreter_executor_initialization(mocker):
 
 
 def test_run_with_valid_python_code(mocker):
-    """Test that PyInterpreterExecutor runs valid Python code."""
+    """Test PyInterpreterExecutor with deterministic mocked process execution."""
     executor = PyInterpreterExecutor(
         shell_cmd="bash -c",
         py_cmd="python -c"
     )
-    x_stdout = b"mock_x_stdout"
-    x_stderr = b"mock_x_stderr"
-    py_code = "print('Hello World')"
+    mock_popen = mocker.patch("subprocess.Popen", autospec=True)
+    mock_process = mock_popen.return_value
+    mock_process.communicate.return_value = (b"Hello World", b"")
 
     stdout, stderr = executor.run(
-        x_stdout=x_stdout,
-        x_stderr=x_stderr,
-        py_code=py_code
+        x_stdout=b"mock_x_stdout",
+        x_stderr=b"mock_x_stderr",
+        py_code="print('Hello World')",
     )
 
     assert stdout.strip() == b"Hello World"
     assert stderr.strip() == b""
+    mock_popen.assert_called_once()
+    assert mock_process.communicate.call_args.kwargs["timeout"] == 600
 
 
 def test_run_with_template_substitution(mocker):
-    """Test template substitution for x_stdout and x_stderr in the Python code."""
+    """Test template substitution without invoking a host shell."""
     executor = PyInterpreterExecutor(
         shell_cmd="bash -c",
         py_cmd="python -c"
     )
-    x_stdout = b"Hello"
-    x_stderr = b"World"
-    py_code = "result = $x_stdout.decode().strip() + ' ' + $x_stderr.decode().strip(); print(result)"
+    mock_popen = mocker.patch("subprocess.Popen", autospec=True)
+    mock_process = mock_popen.return_value
+    mock_process.communicate.return_value = (b"Hello World", b"")
 
     stdout, stderr = executor.run(
-        x_stdout=x_stdout,
-        x_stderr=x_stderr,
-        py_code=py_code
+        x_stdout=b"Hello",
+        x_stderr=b"World",
+        py_code="result = $x_stdout.decode().strip() + ' ' + $x_stderr.decode().strip(); print(result)",
     )
 
     assert stdout.strip() == b"Hello World"
     assert stderr.strip() == b""
+    input_bytes = mock_process.communicate.call_args.kwargs["input"]
+    assert b"b'Hello'" in input_bytes
+    assert b"b'World'" in input_bytes
 
 
 def test_run_with_invalid_python_code(mocker):
