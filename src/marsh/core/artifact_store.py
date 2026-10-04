@@ -94,7 +94,11 @@ class LocalArtifactStore:
                     handle.write("\n")
                     handle.flush()
                     os.fsync(handle.fileno())
-                os.replace(temp_name, manifest_path)
+                try:
+                    os.replace(temp_name, manifest_path)
+                except PermissionError:
+                    if not manifest_path.exists():
+                        raise
             finally:
                 try:
                     os.unlink(temp_name)
