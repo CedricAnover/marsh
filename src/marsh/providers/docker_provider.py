@@ -74,8 +74,6 @@ class DockerProcess:
             self._container = self._client.containers.create(
                 self.config.image,
                 command=[self.spec.executable, *self.spec.arguments],
-                stdout=True,
-                stderr=True,
                 working_dir=self.spec.working_directory,
                 environment=dict(self.spec.environment),
                 detach=True,
