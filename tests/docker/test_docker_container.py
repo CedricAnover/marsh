@@ -140,3 +140,14 @@ def test_docker_container_multiple_exec_run_with_delay(docker_container):
     assert result_1.output.decode().strip() == "Command 1"
     assert result_2.exit_code == 0
     assert result_2.output.decode().strip() == "Command 2"
+
+
+def test_docker_container_cleanup_tolerates_auto_remove_race(mocker):
+    container = DockerContainer("bash:latest", name="cleanup-race")
+    mocker.patch.object(
+        container._client.containers,
+        "list",
+        side_effect=__import__("docker").errors.NotFound("container disappeared"),
+    )
+
+    container._clean()
