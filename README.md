@@ -211,14 +211,22 @@ The current canonical runtime uses a **sequential local execution model**.
 
 Conceptually:
 
-```mermaid
-flowchart TD
-    A[Workflow] --> B[Validation]
-    B --> C[Execution Plan]
-    C --> D[Sequential Scheduler]
-    D --> E[Local Process Execution]
-    E --> F[Structured Results]
-```
+    Workflow
+        |
+        v
+    Validation
+        |
+        v
+    Execution Plan
+        |
+        v
+    Sequential Scheduler
+        |
+        v
+    Local Process Execution
+        |
+        v
+    Structured Results
 
 The workflow model is intentionally separated from the runtime so additional scheduling and execution mechanisms can be introduced without creating another workflow engine.
 
@@ -253,10 +261,10 @@ The dependency graph is validated before execution.
 
 For the example above, the dependency relationship is:
 
-```mermaid
-flowchart LR
-    build --> test
-```
+    build
+      |
+      v
+    test
 
 The current canonical scheduler executes tasks sequentially in deterministic topological order.
 
@@ -369,13 +377,19 @@ def add_prefix(stdout, stderr):
 
 The evaluation order is:
 
-```mermaid
-flowchart TD
-    A[Pre-modifiers] --> B[Pre-processors]
-    B --> C[Command runner]
-    C --> D[Post-modifiers]
-    D --> E[Post-processors]
-```
+    Pre-modifiers
+         |
+         v
+    Pre-processors
+         |
+         v
+    Command runner
+         |
+         v
+    Post-modifiers
+         |
+         v
+    Post-processors
 
 This distinction is important:
 
