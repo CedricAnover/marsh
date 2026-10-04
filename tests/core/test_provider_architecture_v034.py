@@ -94,3 +94,14 @@ def test_machine_and_provider_are_mutually_exclusive():
             provider=ProviderConfig("local"),
             provider_registry=ProviderRegistry({"local": LocalProvider()}),
         )
+
+
+def test_docker_provider_implements_the_same_capability_contract():
+    from marsh.providers.docker_provider import DockerMachine, DockerProvider
+
+    provider = DockerProvider(image="python:3.12-slim")
+    assert isinstance(provider, Provider)
+    assert isinstance(provider.create_machine(), DockerMachine)
+    assert provider.capabilities.satisfies(
+        {"machine.create", "process.start", "process.wait", "process.result"}
+    )
