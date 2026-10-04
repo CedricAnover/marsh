@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import inspect
 import os
 import subprocess
@@ -47,36 +48,25 @@ class ExecutionPlan:
 
 
 def plan_workflow(workflow: Workflow) -> ExecutionPlan:
-    """Validate dependencies and return a deterministic topological plan."""
+    """Validate dependencies and return a deterministic graphlib-backed plan."""
+    from graphlib import TopologicalSorter
+
     tasks = {task.id: task for task in workflow.tasks}
-    indegree = {task.id: len(task.dependencies) for task in workflow.tasks}
-    dependents = {task.id: [] for task in workflow.tasks}
+    graph = {
+        task_id: tuple(sorted(tasks[task_id].dependencies))
+        for task_id in sorted(tasks)
+    }
+    try:
+        order = tuple(TopologicalSorter(graph).static_order())
+    except ValueError as exc:
+        raise ValueError("workflow contains a dependency cycle") from exc
 
-    for task in workflow.tasks:
-        for dependency in task.dependencies:
-            if dependency not in tasks:
-                raise ValueError(
-                    f"task {task.id!r} has unknown dependency: {dependency}"
-                )
-            dependents[dependency].append(task.id)
-
-    ready = sorted(task_id for task_id, degree in indegree.items() if degree == 0)
-    initial_ready = tuple(ready)
-    order = []
-
-    while ready:
-        task_id = ready.pop(0)
-        order.append(task_id)
-        for dependent in sorted(dependents[task_id]):
-            indegree[dependent] -= 1
-            if indegree[dependent] == 0:
-                ready.append(dependent)
-        ready.sort()
-
-    if len(order) != len(tasks):
-        raise ValueError("workflow contains a dependency cycle")
-
-    return ExecutionPlan(order=tuple(order), ready=initial_ready)
+    initial_ready = tuple(
+        task_id
+        for task_id in sorted(tasks)
+        if not tasks[task_id].dependencies
+    )
+    return ExecutionPlan(order=order, ready=initial_ready)
 
 
 class LocalProcess:
@@ -372,20 +362,27 @@ def execute_workflow(
     if isinstance(scheduler, (AsyncScheduler, ThreadScheduler, ProcessScheduler)):
         if isinstance(scheduler, AsyncScheduler):
             raise TypeError("use execute_workflow_async() with AsyncScheduler")
-        run_task = lambda task, dependencies: _execute_task(
-            task, machine, dependencies, policy, cache
+        if isinstance(scheduler, ProcessScheduler):
+            run_task = functools.partial(_execute_process_task, policy=policy)
+        else:
+            run_task = lambda task, dependencies: _execute_task(
+                task, machine, dependencies, policy, cache
+            )
+        results.update(
+            scheduler.execute(
+                workflow,
+                run_task,
+                on_start=lambda task_id: notify(EventType.TASK_STARTED, task_id),
+                on_complete=lambda task_id, result: notify(
+                    EventType.TASK_FAILED if result.failed else EventType.TASK_COMPLETED,
+                    task_id,
+                    result,
+                ),
+                fail_fast=policy.failure.mode == "fail_fast",
+            )
         )
-        return scheduler.execute(
-            workflow,
-            run_task if not isinstance(scheduler, ProcessScheduler) else _execute_process_task,
-            on_start=lambda task_id: notify(EventType.TASK_STARTED, task_id),
-            on_complete=lambda task_id, result: notify(
-                EventType.TASK_FAILED if result.failed else EventType.TASK_COMPLETED,
-                task_id,
-                result,
-            ),
-            fail_fast=policy.failure.mode == "fail_fast",
-        )
+        notify(EventType.WORKFLOW_COMPLETED)
+        return results
 
     for task in scheduler.schedule(workflow):
         failed_dependencies = [
@@ -436,9 +433,10 @@ def execute_workflow(
 def _execute_process_task(
     task: Task,
     dependency_results: Mapping[str, Result],
+    policy: ExecutionPolicy,
 ) -> Result:
-    """Process-safe task callback; no live machine, observer, or cache crosses the boundary."""
-    return _execute_task(task, LocalMachine(), dependency_results, ExecutionPolicy())
+    """Process-safe callback; no live machine, observer, or cache crosses the boundary."""
+    return _execute_task(task, LocalMachine(), dependency_results, policy, None)
 
 
 async def execute_workflow_async(
