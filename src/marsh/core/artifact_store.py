@@ -66,7 +66,20 @@ class LocalArtifactStore:
             "media_type": media_type,
         }
         manifest_path = self.manifest_path_for(ref)
-        if not manifest_path.exists():
+        if manifest_path.exists():
+            existing = json.loads(
+                manifest_path.read_text(encoding="utf-8")
+            )
+            if (
+                existing.get("digest") != digest
+                or existing.get("size") != len(data)
+            ):
+                raise ValueError(
+                    "artifact manifest integrity verification failed"
+                )
+            if existing.get("media_type") != media_type:
+                raise ValueError("artifact metadata conflict")
+        else:
             fd, temp_name = tempfile.mkstemp(
                 prefix="manifest-", dir=self.tmp, text=True
             )
