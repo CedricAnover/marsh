@@ -58,7 +58,7 @@ def test_provenance_is_allow_listed_and_serializable():
 
 def test_artifact_references_are_immutable():
     ref = Artifact(
-        digest="sha256:abc",
+        digest="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         size=3,
         media_type="text/plain",
     )
