@@ -9,8 +9,6 @@ if TYPE_CHECKING:
 
 
 def canonical_bytes(value: Any) -> bytes:
-    if TYPE_CHECKING:
-        pass
     from marsh.core.domain import Workflow
     from marsh.core.ir.errors import SerializationError
     from marsh.core.serialization import workflow_to_json
