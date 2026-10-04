@@ -64,6 +64,30 @@ Scheduler state machine
 
 
 
+## Canonical Workflow IR (v0.3.6)
+
+The canonical workflow boundary is versioned independently from the package release:
+
+```text
+Authoring
+   |
+   v
+Configuration
+   |
+   v
+marsh.workflow/v1
+   |
+   +--> deterministic JSON
+   |
+   v
+Reconstruction
+   |
+   v
+Existing Runtime / Scheduler
+```
+
+The IR is provider-independent and does not introduce a second execution model. Workflow and task IDs are semantic identities; executable Python callables are represented by explicit `OperationRef` values rather than arbitrary live object state. Unsupported runtime values fail explicitly at the boundary.
+
 ## Provider boundary (v0.3.4)
 
 Providers are execution-mechanism adapters. Workflow intent, planning, scheduling, and policy semantics remain provider-independent.
