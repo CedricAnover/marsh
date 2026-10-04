@@ -31,7 +31,7 @@ def _finalize_result(
     result: Result,
     *,
     workflow_id: str,
-    execution_id_value: str,
+    execution_id_value: str | None,
     task_id: str,
     attempt_id: str | None,
     artifact_store: ArtifactStore | None,
@@ -72,6 +72,16 @@ def _finalize_result(
         artifact_refs=tuple(artifact_refs),
         provenance=provenance,
     )
+
+
+def _workflow_execution_id(
+    workflow: Workflow,
+    policy: ExecutionPolicy,
+) -> str | None:
+    try:
+        return execution_id(workflow, policy=policy.to_mapping())
+    except (TypeError, ValueError):
+        return None
 
 
 class _LocalProvider:
@@ -316,18 +326,15 @@ def _execute_task(
 
     cache_key = None
     if policy.cache.enabled and cache is not None:
-        cache_key = cache_key_for_task(task, dependency_results, namespace=policy.cache.namespace)
+        cache_key = cache_key_for_task(
+            task,
+            dependency_results,
+            namespace=policy.cache.namespace,
+        )
         if cache_key is not None:
             cached = cache.get(cache_key)
             if cached is not None and cached.ok:
-                return _finalize_result(
-                    cached,
-                    workflow_id=workflow_id,
-                    execution_id_value=workflow_execution_id,
-                    task_id=task.id,
-                    attempt_id=None,
-                    artifact_store=artifact_store,
-                )
+                return cached
 
     if policy.resources is not None:
         requested = task.metadata.get("resources", {})
@@ -450,7 +457,7 @@ def execute_workflow(
     scheduler = scheduler or SequentialScheduler()
     policy = policy or ExecutionPolicy.from_mapping(workflow.policy)
     results: dict[str, Result] = {}
-    workflow_execution_id = execution_id(workflow, policy=policy.to_mapping())
+    workflow_execution_id = _workflow_execution_id(workflow, policy)
     sequence = 0
 
     def notify(event_type: EventType, task_id: str | None = None, result: Result | None = None) -> None:
@@ -564,22 +571,9 @@ def _execute_process_task(
     task: Task,
     dependency_results: Mapping[str, Result],
     policy: ExecutionPolicy,
-    *,
-    workflow_id: str,
-    workflow_execution_id: str,
-    artifact_store: ArtifactStore | None,
 ) -> Result:
     """Process-safe callback; no live machine, observer, or cache crosses the boundary."""
-    return _execute_task(
-        task,
-        LocalMachine(),
-        dependency_results,
-        policy,
-        None,
-        workflow_id=workflow_id,
-        workflow_execution_id=workflow_execution_id,
-        artifact_store=artifact_store,
-    )
+    return _execute_task(task, LocalMachine(), dependency_results, policy, None)
 
 
 async def execute_workflow_async(
