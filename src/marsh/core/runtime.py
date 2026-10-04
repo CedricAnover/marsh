@@ -480,7 +480,12 @@ def execute_workflow(
         if isinstance(scheduler, AsyncScheduler):
             raise TypeError("use execute_workflow_async() with AsyncScheduler")
         if isinstance(scheduler, ProcessScheduler):
-            run_task = functools.partial(_execute_process_task, policy=policy)
+            run_task = functools.partial(
+                _execute_process_task,
+                policy=policy,
+                workflow_id=workflow.id,
+                workflow_execution_id=workflow_execution_id,
+            )
         else:
             run_task = lambda task, dependencies: _execute_task(
                 task,
@@ -510,7 +515,7 @@ def execute_workflow(
                 fail_fast=policy.failure.mode == "fail_fast",
             )
         )
-        if isinstance(scheduler, ProcessScheduler):
+        if isinstance(scheduler, ProcessScheduler) and artifact_store is not None:
             results = {
                 task_id: _finalize_result(
                     result,
@@ -578,9 +583,21 @@ def _execute_process_task(
     task: Task,
     dependency_results: Mapping[str, Result],
     policy: ExecutionPolicy,
+    *,
+    workflow_id: str,
+    workflow_execution_id: str | None,
 ) -> Result:
     """Process-safe callback; no live machine, observer, or cache crosses the boundary."""
-    return _execute_task(task, LocalMachine(), dependency_results, policy, None)
+    return _execute_task(
+        task,
+        LocalMachine(),
+        dependency_results,
+        policy,
+        None,
+        workflow_id=workflow_id,
+        workflow_execution_id=workflow_execution_id,
+        artifact_store=None,
+    )
 
 
 async def execute_workflow_async(
