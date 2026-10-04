@@ -590,7 +590,7 @@ async def execute_workflow_async(
     policy = policy or ExecutionPolicy.from_mapping(workflow.policy)
     machine = machine or LocalMachine()
     results: dict[str, Result] = {}
-    workflow_execution_id = execution_id(workflow, policy=policy.to_mapping())
+    workflow_execution_id = _workflow_execution_id(workflow, policy)
     sequence = 0
 
     def notify(event_type: EventType, task_id: str | None = None, result: Result | None = None) -> None:
