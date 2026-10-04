@@ -338,3 +338,32 @@ def test_execute_workflow_accepts_replacement_scheduler_and_machine_contracts():
         "wait",
     ]
     assert all(result.ok for result in results.values())
+
+
+def test_execute_workflow_fail_fast_stops_after_first_failed_task():
+    seen = []
+
+    def fail(inputs, dependencies):
+        seen.append("fail")
+        return Result(status=ProcessStatus.FAILED, error="boom")
+
+    def independent(inputs, dependencies):
+        seen.append("independent")
+        return Result(stdout=b"ok")
+
+    workflow = Workflow(
+        id="fail-fast",
+        tasks=(
+            Task(id="fail", operation=fail),
+            Task(id="independent", operation=independent),
+        ),
+    )
+
+    results = execute_workflow(
+        workflow,
+        policy=ExecutionPolicy(failure=FailurePolicy("fail_fast")),
+    )
+
+    assert seen == ["fail"]
+    assert results["fail"].status is ProcessStatus.FAILED
+    assert "independent" not in results
