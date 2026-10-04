@@ -4,6 +4,7 @@ import pytest
 
 from marsh.core.configuration import TaskConfig, WorkflowConfig, normalize_workflow
 from marsh.core.domain import Task, Workflow
+from marsh.core.runtime import plan_workflow
 from marsh.core.serialization import (
     workflow_from_json,
     workflow_to_dict,
@@ -104,3 +105,34 @@ def test_serialization_rejects_non_data_operations():
 
     with pytest.raises(TypeError, match="serializable"):
         workflow_to_json(workflow)
+
+
+def test_validation_delegates_to_the_canonical_execution_plan():
+    workflow = Workflow(
+        id="equivalent",
+        tasks=(
+            Task(id="c", operation="echo", dependencies=("a",)),
+            Task(id="a", operation="echo"),
+            Task(id="b", operation="echo"),
+        ),
+    )
+
+    plan = plan_workflow(workflow)
+
+    assert validate_workflow(workflow) == plan.order
+    assert plan.ready == ("a", "b")
+
+
+def test_planning_does_not_mutate_workflow_tasks_or_dependencies():
+    tasks = (
+        Task(id="b", operation="echo", dependencies=("a",)),
+        Task(id="a", operation="echo"),
+    )
+    workflow = Workflow(id="pure", tasks=tasks)
+
+    before = workflow.tasks
+    plan = plan_workflow(workflow)
+
+    assert plan.order == ("a", "b")
+    assert workflow.tasks == before
+    assert workflow.tasks[0].dependencies == ("a",)

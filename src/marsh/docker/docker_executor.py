@@ -103,7 +103,11 @@ class DockerContainer:
             self._timer.cancel()
 
         # Remove the Container
-        all_containers: list[Container] = self._client.containers.list(all=True)
+        try:
+            all_containers: list[Container] = self._client.containers.list(all=True)
+        except NotFound:
+            all_containers = []
+
         for container in all_containers:
             if container.name == self._name:
                 try:

@@ -122,3 +122,4 @@ def test_process_protocol_can_expose_optional_capabilities_without_universal_met
 
     assert isinstance(MinimalProcess(), Startable)
     assert isinstance(MinimalProcess(), Waitable)
+
