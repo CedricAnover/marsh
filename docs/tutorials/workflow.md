@@ -35,9 +35,9 @@ The public API separates **what work means** from **how work is executed**:
 - Providers/executors perform the actual work.
 - `Result` records execution outcome and diagnostics.
 
-The current canonical runtime is intentionally **sequential and local**. Existing SSH, Docker, Python, command-composition, and DAG APIs remain compatibility surfaces.
+The canonical runtime remains local, with sequential and bounded-concurrency scheduler modes available through the public runtime APIs. Existing SSH, Docker, Python, command-composition, and DAG APIs remain compatibility surfaces.
 
-See [the architecture overview](architecture.md) for the implemented boundaries.
+See [the architecture overview](../concepts/architecture.md) for the implemented boundaries.
 
 ## 2. Minimal workflow
 
@@ -70,7 +70,7 @@ if not result.ok:
 print(result.stdout.decode().strip())
 ```
 
-The repository version of this example is [`samples/workflow_basic.py`](../samples/workflow_basic.py).
+The repository version of this example is [`samples/workflow_basic.py`](../../samples/workflow_basic.py).
 
 ## 3. Validate before executing
 
@@ -263,7 +263,7 @@ Marsh retains its established lower-level APIs:
 
 New workflow functionality should prefer the canonical Workflow contracts and adapt existing mechanisms rather than creating another execution model.
 
-For migration-oriented examples and the full public surface, start with the [repository README](../README.md).
+For migration-oriented examples and the full public surface, start with the [repository README](../../README.md).
 
 ## 12. Recommended application pattern
 
@@ -299,7 +299,7 @@ The current Alpha implementation has deliberate limits:
 
 - canonical execution is local and sequential;
 - general task-to-task output/input dataflow is limited;
-- there is no standalone canonical workflow CLI;
+- the v0.3.9 CLI provides read-only workflow inspection and extension discovery; it does not execute workflows;
 - YAML authoring is not currently provided;
 - callable operations are Python-specific and are not portable JSON definitions;
 - remote/container execution remains available through existing APIs rather than the canonical local runtime.

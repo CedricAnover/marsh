@@ -234,6 +234,6 @@ This policy keeps application migrations incremental while the workflow kernel c
 
 ## 12. Further reading
 
-- [Workflow Guide](workflow-guide.md) — canonical examples and workflow semantics.
-- [Architecture](architecture.md) — implemented architecture and boundaries.
-- [Samples](../samples/) — runnable canonical examples.
+- [Workflow Guide](../tutorials/workflow.md) — canonical examples and workflow semantics.
+- [Architecture](../concepts/architecture.md) — implemented architecture and boundaries.
+- [Samples](../../samples/) — runnable canonical examples.
