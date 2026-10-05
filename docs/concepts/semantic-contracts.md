@@ -1,6 +1,6 @@
 # Semantic contract
 
-This document is the implementation contract for the Stable Workflow Kernel. It freezes semantic ownership before remote execution work.
+This document is the implementation contract for the v0.4.0 Stable Workflow Kernel. It freezes semantic ownership before v0.4.1 remote execution work.
 
 ## Canonical ownership
 
@@ -32,7 +32,7 @@ Current terminal outcomes are:
 - `skipped`
 - `blocked`
 
-The kernel adds explicit `unknown` and `ambiguous` observation states. They are unresolved states, not proof of success or failure, and therefore are not treated as terminal lifecycle completion. An infrastructure/provider error is not, by itself, proof that work did not complete.
+v0.4.0 adds explicit `unknown` and `ambiguous` observation states. They are unresolved states, not proof of success or failure, and therefore are not treated as terminal lifecycle completion. An infrastructure/provider error is not, by itself, proof that work did not complete.
 
 Non-negotiable invariants:
 
@@ -88,7 +88,7 @@ Minimum negative-path coverage includes timeout, cancellation, cleanup failure, 
 
 The kernel remains standard-library-first. Optional infrastructure dependencies belong behind explicit provider/adapter boundaries.
 
-## Non-goals
+## v0.4.0 non-goals
 
 - remote transport implementation;
 - distributed control plane;
@@ -98,6 +98,6 @@ The kernel remains standard-library-first. Optional infrastructure dependencies 
 - mandatory new runtime dependencies;
 - generalized persistence/event sourcing.
 
-## Remote execution boundary
+## v0.4.1 boundary
 
-Remote execution may define and implement the minimum remote transport boundary only after these semantics are executable and conformance-tested. Remote execution must preserve the same identity, lifecycle, ambiguity, cancellation, artifact, and reconciliation vocabulary rather than redefine it.
+v0.4.1 may define and implement the minimum remote transport boundary only after these semantics are executable and conformance-tested. Remote execution must preserve the same identity, lifecycle, ambiguity, cancellation, artifact, and reconciliation vocabulary rather than redefine it.
