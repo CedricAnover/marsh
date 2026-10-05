@@ -52,6 +52,12 @@ def inspect_workflow(
             "observed": False,
             "identity": None,
         },
+        "artifacts": {
+            "observed": False,
+            "refs": [],
+        },
+        "provenance": None,
+        "ambiguity": None,
         "execution": {
             "performed": False,
         },
