@@ -1,4 +1,4 @@
-# v0.3.6 Workflow IR
+# Workflow IR
 
 Marsh v0.3.6 establishes the versioned `marsh.workflow/v1` canonical Workflow IR.
 

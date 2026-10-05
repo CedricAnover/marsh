@@ -5,7 +5,7 @@ from marsh.core import *
 try:
     __version__ = version("marsh-lib")
 except PackageNotFoundError:  # pragma: no cover
-    __version__ = "0.3.9"
+    __version__ = "0.4.0"
 
 
 def __getattr__(name):

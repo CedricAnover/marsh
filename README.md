@@ -6,6 +6,8 @@ Marsh separates **workflow definition** from **execution**. Work can be represen
 
 The project is evolving toward a small, dependency-light workflow and execution kernel while preserving its existing command, executor, and DAG APIs.
 
+> **Current release status:** the stable semantic-kernel/conformance contract is implemented and release validation is in progress. See [the semantic contract](docs/concepts/semantic-contracts.md) and [the release gates](docs/releases/).
+
 > **Project status:** Alpha
 
 ## Features
@@ -537,7 +539,7 @@ The existing DAG API currently provides dependency execution but does not provid
 
 Applications requiring the canonical workflow semantics should prefer `Workflow` and `Task`.
 
-## CLI inspection and extensions (v0.3.9)
+## CLI inspection and extensions
 
 Marsh now provides a read-only CLI boundary for inspecting canonical workflow
 semantics without executing work:
@@ -584,6 +586,7 @@ The documentation is organized for progressive discovery:
 - [Documentation index](docs/README.md) — entry point and documentation map.
 - [Workflow tutorial](docs/tutorials/workflow.md) — canonical Workflow API walkthrough.
 - [Architecture](docs/concepts/architecture.md) — implemented architecture and design boundaries.
+- [Semantic contract](docs/concepts/semantic-contracts.md) — canonical semantic ownership, lifecycle, identity, capability, recovery, and conformance rules.
 - [Artifacts and reproducibility](docs/concepts/artifacts-and-reproducibility.md) — identity, artifacts, provenance, and integrity.
 - [API migration](docs/how-to/migrate-api.md) — incremental migration from legacy APIs.
 - [CLI reference](docs/reference/cli.md) — read-only inspection and extension discovery commands.

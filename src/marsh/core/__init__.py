@@ -33,6 +33,8 @@ from marsh.core.providers import (
     LocalProvider,
     Provider,
     ProviderCapabilities,
+    CapabilityMatch,
+    CapabilityRequirement,
     ProviderConfig,
     ProviderConfigurationError,
     ProviderError,
@@ -47,3 +49,6 @@ from marsh.core.scheduler import AsyncScheduler, ConcurrentScheduler, ExecutorSc
 from marsh.core.artifacts import Artifact, ArtifactRef, ArtifactStore, Provenance
 from marsh.core.artifact_store import LocalArtifactStore
 from marsh.core.identity import canonical_bytes, content_digest, execution_id
+from marsh.core.inspection import inspect_workflow
+
+from marsh.core.recovery import RecoveryResult, RecoveryStatus, execute_with_postcondition

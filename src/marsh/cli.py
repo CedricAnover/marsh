@@ -38,29 +38,9 @@ def _parser() -> argparse.ArgumentParser:
 
 def _inspect(path: Path) -> dict[str, Any]:
     workflow = workflow_from_json(path.read_text(encoding="utf-8"))
-    from marsh.core.identity import execution_id
-    from marsh.core.runtime import plan_workflow
+    from marsh.core.inspection import inspect_workflow
 
-    plan = plan_workflow(workflow)
-    identity = None
-    try:
-        identity = execution_id(workflow, policy=workflow.policy)
-    except (TypeError, ValueError):
-        pass
-
-    return {
-        "workflow": {
-            "id": workflow.id,
-            "task_count": len(workflow.tasks),
-            "task_ids": [task.id for task in workflow.tasks],
-        },
-        "plan": {
-            "order": list(plan.order),
-            "ready": list(plan.ready),
-        },
-        "identity": {"execution_id": identity},
-        "execution": {"performed": False},
-    }
+    return inspect_workflow(workflow)
 
 
 def _print(value: Any, machine: bool) -> None:

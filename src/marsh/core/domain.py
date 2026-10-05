@@ -21,6 +21,9 @@ class ProcessStatus(str, Enum):
     CANCELLED = "cancelled"
     TIMED_OUT = "timed_out"
     SKIPPED = "skipped"
+    BLOCKED = "blocked"
+    UNKNOWN = "unknown"
+    AMBIGUOUS = "ambiguous"
 
 
 _TERMINAL_STATUSES = frozenset(
@@ -30,6 +33,7 @@ _TERMINAL_STATUSES = frozenset(
         ProcessStatus.CANCELLED,
         ProcessStatus.TIMED_OUT,
         ProcessStatus.SKIPPED,
+        ProcessStatus.BLOCKED,
     }
 )
 
@@ -65,6 +69,17 @@ def is_terminal(status: ProcessStatus) -> bool:
     """Return whether a process status represents a terminal outcome."""
 
     return status in _TERMINAL_STATUSES
+
+
+@dataclass(frozen=True)
+class ProcessIdentity:
+    """Stable runtime identity independent of PID/provider-local handles."""
+
+    value: str
+
+    def __post_init__(self) -> None:
+        if not self.value or not self.value.strip():
+            raise ValueError("process identity must be non-empty")
 
 
 @dataclass(frozen=True)
@@ -256,3 +271,55 @@ class Scheduler(Protocol):
 
     def schedule(self, workflow: Workflow) -> Sequence[Task]:
         ...
+
+class Workspace(Protocol):
+    """Capability boundary for a workflow execution workspace."""
+
+    @property
+    def location(self) -> str:
+        ...
+
+
+@runtime_checkable
+class ProcessObservation(Protocol):
+    """Capability for observing process identity and lifecycle."""
+
+    @property
+    def process_id(self) -> str:
+        ...
+
+    def poll(self) -> ProcessStatus:
+        ...
+
+
+@runtime_checkable
+class ProcessControl(Protocol):
+    """Capability for requesting process lifecycle actions."""
+
+    def stop(self) -> Any:
+        ...
+
+    def terminate(self) -> Any:
+        ...
+
+    def kill(self) -> Any:
+        ...
+
+
+@runtime_checkable
+class ResourceObservation(Protocol):
+    """Capability for observing provider resource availability."""
+
+    def resources(self) -> Mapping[str, Any]:
+        ...
+
+
+@runtime_checkable
+class Isolation(Protocol):
+    """Capability describing execution isolation."""
+
+    @property
+    def mode(self) -> str:
+        ...
+
+
