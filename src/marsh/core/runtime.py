@@ -7,6 +7,7 @@ import inspect
 import os
 import subprocess
 import time
+import uuid
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import Any, Mapping
@@ -16,6 +17,7 @@ from marsh.core.cache import Cache, cache_key_for_task
 from marsh.core.identity import execution_id
 from marsh.core.domain import (
     ProcessSpec,
+    ProcessIdentity,
     ProcessStatus,
     Result,
     Task,
@@ -136,6 +138,7 @@ class LocalProcess:
         self.spec = spec
         self._process: subprocess.Popen[bytes] | None = None
         self._status = ProcessStatus.CREATED
+        self._identity = ProcessIdentity(uuid.uuid4().hex)
         self._result: Result | None = None
         self._cancelled = False
         self._started_at: float | None = None
@@ -144,6 +147,10 @@ class LocalProcess:
     @property
     def status(self) -> ProcessStatus:
         return self._status
+
+    @property
+    def process_id(self) -> str:
+        return self._identity.value
 
     def _transition(self, target: ProcessStatus) -> None:
         if target is self._status:
