@@ -6,7 +6,7 @@ Marsh separates **workflow definition** from **execution**. Work can be represen
 
 The project is evolving toward a small, dependency-light workflow and execution kernel while preserving its existing command, executor, and DAG APIs.
 
-> **v0.4.0 development:** the stable semantic-kernel contract is being hardened before remote-execution work. See [the v0.4.0 semantic contract](docs/concepts/semantic-contracts.md).
+> **v0.4.0 release candidate:** the stable semantic-kernel/conformance contract is implemented and release validation is in progress. See [the v0.4.0 semantic contract](docs/concepts/semantic-contracts.md) and [the v0.4.0 release gates](docs/releases/v0.4.0.md).
 
 > **Project status:** Alpha
 
