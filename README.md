@@ -6,6 +6,8 @@ Marsh separates **workflow definition** from **execution**. Work can be represen
 
 The project is evolving toward a small, dependency-light workflow and execution kernel while preserving its existing command, executor, and DAG APIs.
 
+> **v0.4.0 development:** the stable semantic-kernel contract is being hardened before remote-execution work. See [the v0.4.0 semantic contract](docs/concepts/semantic-contracts.md).
+
 > **Project status:** Alpha
 
 ## Features
@@ -584,6 +586,7 @@ The documentation is organized for progressive discovery:
 - [Documentation index](docs/README.md) — entry point and documentation map.
 - [Workflow tutorial](docs/tutorials/workflow.md) — canonical Workflow API walkthrough.
 - [Architecture](docs/concepts/architecture.md) — implemented architecture and design boundaries.
+- [v0.4.0 semantic contract](docs/concepts/semantic-contracts.md) — canonical semantic ownership, lifecycle, identity, capability, recovery, and conformance rules.
 - [Artifacts and reproducibility](docs/concepts/artifacts-and-reproducibility.md) — identity, artifacts, provenance, and integrity.
 - [API migration](docs/how-to/migrate-api.md) — incremental migration from legacy APIs.
 - [CLI reference](docs/reference/cli.md) — read-only inspection and extension discovery commands.
