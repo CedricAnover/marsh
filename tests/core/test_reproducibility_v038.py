@@ -100,3 +100,25 @@ def test_artifact_store_recovers_when_windows_replace_reports_access_denied_afte
 
     assert store.verify(ref)
     assert store.object_count() == 1
+
+
+def test_artifact_store_retries_transient_manifest_read_lock(tmp_path, monkeypatch):
+    store = LocalArtifactStore(tmp_path)
+    ref = store.put(b"manifest lock")
+    manifest = store.manifest_path_for(ref)
+    from pathlib import Path
+
+    original_read_text = Path.read_text
+    attempts = 0
+
+    def read_text_with_transient_lock(path, *args, **kwargs):
+        nonlocal attempts
+        if path == manifest:
+            attempts += 1
+            if attempts < 3:
+                raise PermissionError(13, "Access is denied")
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", read_text_with_transient_lock)
+    assert store.get(ref) == b"manifest lock"
+    assert attempts == 3

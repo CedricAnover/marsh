@@ -3,10 +3,26 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import time
 from pathlib import Path
 
 from marsh.core.artifacts import Artifact, ArtifactRef
 from marsh.core.identity import content_digest
+
+_READ_RETRIES = 8
+_READ_RETRY_DELAY_SECONDS = 0.01
+
+
+def _read_text_with_retry(path: Path) -> str:
+    """Read a small metadata file across transient Windows replace locks."""
+    for attempt in range(_READ_RETRIES):
+        try:
+            return path.read_text(encoding="utf-8")
+        except PermissionError:
+            if attempt == _READ_RETRIES - 1:
+                raise
+            time.sleep(_READ_RETRY_DELAY_SECONDS * (attempt + 1))
+    raise AssertionError("unreachable")
 
 
 class LocalArtifactStore:
@@ -72,9 +88,7 @@ class LocalArtifactStore:
         }
         manifest_path = self.manifest_path_for(ref)
         if manifest_path.exists():
-            existing = json.loads(
-                manifest_path.read_text(encoding="utf-8")
-            )
+            existing = json.loads(_read_text_with_retry(manifest_path))
             if (
                 existing.get("digest") != digest
                 or existing.get("size") != len(data)
@@ -127,9 +141,7 @@ class LocalArtifactStore:
             raise ValueError("artifact integrity verification failed")
         manifest_path = self.manifest_path_for(ref)
         if manifest_path.is_file():
-            manifest = json.loads(
-                manifest_path.read_text(encoding="utf-8")
-            )
+            manifest = json.loads(_read_text_with_retry(manifest_path))
             if (
                 manifest.get("digest") != ref.digest
                 or manifest.get("size") != ref.size
