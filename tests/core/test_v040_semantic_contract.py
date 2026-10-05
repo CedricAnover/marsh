@@ -10,6 +10,7 @@ def test_v040_terminal_outcomes_are_explicit_and_non_regressing():
         ProcessStatus.CANCELLED,
         ProcessStatus.TIMED_OUT,
         ProcessStatus.SKIPPED,
+        ProcessStatus.BLOCKED,
     }
 
     assert {status for status in ProcessStatus if is_terminal(status)} == terminal
