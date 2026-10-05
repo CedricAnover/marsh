@@ -1,4 +1,11 @@
-from importlib.metadata import PackageNotFoundError, version\n\nfrom marsh.core import *\n\ntry:\n    __version__ = version("marsh-lib")\nexcept PackageNotFoundError:  # pragma: no cover\n    __version__ = "0.3.9"
+from importlib.metadata import PackageNotFoundError, version
+
+from marsh.core import *
+
+try:
+    __version__ = version("marsh-lib")
+except PackageNotFoundError:  # pragma: no cover
+    __version__ = "0.3.9"
 
 
 def __getattr__(name):
