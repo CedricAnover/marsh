@@ -555,12 +555,12 @@ Optional integrations are discovered through the standard Python entry-point gro
 `marsh.extensions`. Discovery is deterministic and performs compatibility checks
 before loading extension code. Extensions must declare the
 `Marsh-Extension-Contract` metadata field. See
-[the v0.3.9 CLI guide](docs/cli-v0.3.9.md) and
-[the extension guide](docs/extension-guide-v0.3.9.md).
+[the CLI reference](docs/reference/cli.md) and
+[the extension reference](docs/reference/extensions.md).
 
 ## Architecture
 
-For the implemented architecture and design boundaries, see [`docs/architecture.md`](docs/architecture.md).
+For the implemented architecture and design boundaries, see [`docs/concepts/architecture.md`](docs/concepts/architecture.md).
 
 ## Current limitations
 
@@ -577,44 +577,20 @@ The current release line intentionally has several boundaries:
 These limitations describe the current implementation; they should not be interpreted as permanent exclusions.
 
 
-## Artifacts and reproducibility (v0.3.8)
+## Documentation
 
-v0.3.8 adds provider-independent identity and artifact primitives around the canonical Workflow runtime.
+The documentation is organized for progressive discovery:
 
-A successful result can expose:
+- [Documentation index](docs/README.md) — entry point and documentation map.
+- [Workflow tutorial](docs/tutorials/workflow.md) — canonical Workflow API walkthrough.
+- [Architecture](docs/concepts/architecture.md) — implemented architecture and design boundaries.
+- [Artifacts and reproducibility](docs/concepts/artifacts-and-reproducibility.md) — identity, artifacts, provenance, and integrity.
+- [API migration](docs/how-to/migrate-api.md) — incremental migration from legacy APIs.
+- [CLI reference](docs/reference/cli.md) — read-only inspection and extension discovery commands.
+- [Extension reference](docs/reference/extensions.md) — extension metadata and compatibility rules.
+- [Workflow IR reference](docs/reference/workflow-ir.md) — canonical `marsh.workflow/v1` representation.
+- [Release history](docs/releases/) — version-specific release documentation.
 
-    result.execution_id     # stable semantic execution identity when portable
-    result.attempt_id       # v0.3.7 per-attempt identity
-    result.artifact_refs    # immutable content-addressed artifact references
-    result.provenance       # allow-listed, serializable provenance
-
-Execution identity is derived from canonical workflow semantics. Attempt identity is intentionally separate, so retries do not create a new logical execution identity. Artifact identity is content-derived with SHA-256 and does not depend on where the bytes are stored.
-
-### Opt-in artifact persistence
-
-Use the local content-addressed store when artifact persistence is required:
-
-    from pathlib import Path
-    from marsh import LocalArtifactStore, execute_workflow
-
-    store = LocalArtifactStore(Path(".marsh-artifacts"))
-    results = execute_workflow(workflow, artifact_store=store)
-    result = results["greet"]
-
-    for artifact in result.artifact_refs:
-        assert store.verify(artifact)
-
-The store verifies artifact size and digest on reads and uses temporary files plus atomic finalization for writes. Artifact storage is opt-in; the normal runtime does not require a local artifact directory.
-
-### Cache identity
-
-Caching remains opt-in through the existing policy boundary. Cache keys now use the shared canonical identity primitives rather than a second JSON/hash implementation. A cache hit reuses the cached successful result and does not create another execution attempt.
-
-### Reproducibility boundary
-
-Portable identity data must be deterministic and serializable. Unsupported runtime objects, non-finite numeric values, and non-portable callable definitions are rejected by the identity boundary. Legacy workflows that use non-portable callables remain executable, but they do not receive a portable execution identity.
-
-See docs/artifacts-and-reproducibility.md for the contract, storage layout, provenance rules, and reproducibility guidance.
 
 ## Development
 
@@ -663,7 +639,7 @@ remain important compatibility surfaces.
 
 New functionality should prefer the canonical workflow contracts and adapt existing mechanisms into them rather than introducing a separate execution model.
 
-For migration examples and legacy/deprecation guidance, see [`docs/api-migration.md`](docs/api-migration.md).
+For migration examples and legacy/deprecation guidance, see [`docs/how-to/migrate-api.md`](docs/how-to/migrate-api.md).
 
 ## Contributing
 
