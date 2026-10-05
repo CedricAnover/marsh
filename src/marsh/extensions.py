@@ -36,8 +36,15 @@ def _selected_entry_points() -> tuple[Any, ...]:
     entry_points = metadata.entry_points()
     if hasattr(entry_points, "select"):
         selected = entry_points.select(group=EXTENSION_ENTRY_POINT_GROUP)
-    else:  # pragma: no cover - Python 3.10 compatibility path
+    elif hasattr(entry_points, "get"):
         selected = entry_points.get(EXTENSION_ENTRY_POINT_GROUP, ())
+    else:  # pragma: no cover - test doubles and legacy iterable APIs
+        selected = (
+            item
+            for item in entry_points
+            if getattr(item, "group", EXTENSION_ENTRY_POINT_GROUP)
+            == EXTENSION_ENTRY_POINT_GROUP
+        )
     return tuple(sorted(selected, key=lambda item: (item.name, item.value)))
 
 
