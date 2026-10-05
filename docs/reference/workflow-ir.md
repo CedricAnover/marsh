@@ -1,6 +1,6 @@
 # Workflow IR
 
-Marsh establishes the versioned `marsh.workflow/v1` canonical Workflow IR.
+Marsh v0.3.6 establishes the versioned `marsh.workflow/v1` canonical Workflow IR.
 
 ## Boundary
 
@@ -46,9 +46,9 @@ Process operations use structured `ProcessSpec` data. The v1 value contract acce
 
 ## Configuration
 
-Configuration remains separate from runtime domain objects. Marsh adds provider-neutral Machine, Scheduler, Policy, and Provider configuration families.
+Configuration remains separate from runtime domain objects. v0.3.6 adds provider-neutral Machine, Scheduler, Policy, and Provider configuration families.
 
-Pydantic 2.x was evaluated as a boundary-validation dependency but is not required: the existing dependency-free dataclass boundary is sufficiently small, explicit, and testable, while adding Pydantic would increase the minimal core dependency surface without removing a current semantic responsibility.
+Pydantic 2.x was evaluated as a boundary-validation dependency but is not required for this release: the existing dependency-free dataclass boundary is sufficiently small, explicit, and testable, while adding Pydantic would increase the minimal core dependency surface without removing a current semantic responsibility.
 
 ## Determinism and compatibility
 
