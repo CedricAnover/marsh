@@ -29,6 +29,9 @@ def test_semantic_inspection_is_read_only_and_deterministic():
     assert first["execution"]["performed"] is False
     assert first["lifecycle"]["status"] == "not_started"
     assert first["process"]["identity"] is None
+    assert first["artifacts"]["refs"] == []
+    assert first["provenance"] is None
+    assert first["ambiguity"] is None
     assert first["provider"]["available"] is True
     assert first["provider"]["capabilities"] == sorted(first["provider"]["capabilities"])
 
