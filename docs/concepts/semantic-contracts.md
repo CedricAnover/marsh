@@ -30,8 +30,9 @@ Current terminal outcomes are:
 - `cancelled`
 - `timed_out`
 - `skipped`
+- `blocked`
 
-v0.4.0 will add explicit ambiguity/unknown-state semantics only where an observation cannot establish a terminal outcome. An infrastructure/provider error is not, by itself, proof that work did not complete.
+v0.4.0 adds explicit `unknown` and `ambiguous` observation states. They are unresolved states, not proof of success or failure, and therefore are not treated as terminal lifecycle completion. An infrastructure/provider error is not, by itself, proof that work did not complete.
 
 Non-negotiable invariants:
 
