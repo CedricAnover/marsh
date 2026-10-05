@@ -50,3 +50,4 @@ from marsh.core.artifacts import Artifact, ArtifactRef, ArtifactStore, Provenanc
 from marsh.core.artifact_store import LocalArtifactStore
 from marsh.core.identity import canonical_bytes, content_digest, execution_id
 \nfrom marsh.core.inspection import inspect_workflow\n
+from marsh.core.recovery import RecoveryResult, RecoveryStatus, execute_with_postcondition
