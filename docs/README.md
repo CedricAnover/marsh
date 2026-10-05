@@ -11,6 +11,7 @@ deeper user and developer guidance.
 ## Concepts
 
 - [Architecture](concepts/architecture.md) — implemented architectural boundaries and semantic ownership.
+- [v0.4.0 semantic contract](concepts/semantic-contracts.md) — canonical semantic ownership, lifecycle, identity, capability, recovery, and conformance rules.
 - [Artifacts and reproducibility](concepts/artifacts-and-reproducibility.md) — execution/attempt/artifact identity, provenance, and content-addressed storage.
 
 ## How-to guides
