@@ -106,16 +106,19 @@ def test_artifact_store_retries_transient_manifest_read_lock(tmp_path, monkeypat
     store = LocalArtifactStore(tmp_path)
     ref = store.put(b"manifest lock")
     manifest = store.manifest_path_for(ref)
-    original_read_text = manifest.read_text
+    from pathlib import Path
+
+    original_read_text = Path.read_text
     attempts = 0
 
-    def read_text_with_transient_lock(*args, **kwargs):
+    def read_text_with_transient_lock(path, *args, **kwargs):
         nonlocal attempts
-        attempts += 1
-        if attempts < 3:
-            raise PermissionError(13, "Access is denied")
-        return original_read_text(*args, **kwargs)
+        if path == manifest:
+            attempts += 1
+            if attempts < 3:
+                raise PermissionError(13, "Access is denied")
+        return original_read_text(path, *args, **kwargs)
 
-    monkeypatch.setattr(manifest, "read_text", read_text_with_transient_lock)
+    monkeypatch.setattr(Path, "read_text", read_text_with_transient_lock)
     assert store.get(ref) == b"manifest lock"
     assert attempts == 3
