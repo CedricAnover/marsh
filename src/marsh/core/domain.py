@@ -72,6 +72,17 @@ def is_terminal(status: ProcessStatus) -> bool:
 
 
 @dataclass(frozen=True)
+class ProcessIdentity:
+    """Stable runtime identity independent of PID/provider-local handles."""
+
+    value: str
+
+    def __post_init__(self) -> None:
+        if not self.value or not self.value.strip():
+            raise ValueError("process identity must be non-empty")
+
+
+@dataclass(frozen=True)
 class ProcessSpec:
     """Reified description of one process before execution."""
 
