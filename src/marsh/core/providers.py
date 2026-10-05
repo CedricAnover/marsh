@@ -47,6 +47,34 @@ class ProviderCapabilities:
 
 
 @dataclass(frozen=True)
+
+@dataclass(frozen=True)
+class CapabilityRequirement:
+    """Provider-independent capability requirements for admission."""
+
+    required: frozenset[str]
+
+    def __init__(self, required: Iterable[str] = ()):
+        normalized = frozenset(str(value).strip() for value in required)
+        if "" in normalized:
+            raise ValueError("capability requirements cannot contain empty names")
+        object.__setattr__(self, "required", normalized)
+
+
+@dataclass(frozen=True)
+class CapabilityMatch:
+    """Deterministic capability negotiation result."""
+
+    provider: str
+    required: frozenset[str]
+    available: frozenset[str]
+    missing: frozenset[str]
+
+    @property
+    def satisfied(self) -> bool:
+        return not self.missing
+
+
 class ProviderConfig:
     """Provider selection/configuration without provider-specific semantics."""
 
@@ -151,9 +179,35 @@ class ProviderRegistry:
             )
         return provider
 
+    def negotiate(
+        self,
+        name: str,
+        capabilities: Iterable[str] = (),
+    ) -> CapabilityMatch:
+        provider = self.get(name)
+        required = CapabilityRequirement(capabilities).required
+        available = (
+            provider.capabilities.values if provider is not None else frozenset()
+        )
+        return CapabilityMatch(
+            provider=name.strip(),
+            required=required,
+            available=frozenset(available),
+            missing=frozenset(required - available),
+        )
+
     def resolve(
         self,
         config: ProviderConfig,
         capabilities: Iterable[str] = (),
     ) -> Provider:
-        return self.require(config.name, capabilities)
+        match = self.negotiate(config.name, capabilities)
+        provider = self.get(config.name)
+        if provider is None:
+            raise KeyError(config.name)
+        if not match.satisfied:
+            missing = sorted(match.missing)
+            raise UnsupportedCapabilityError(
+                f"provider {config.name!r} does not support capabilities: {', '.join(missing)}"
+            )
+        return provider
