@@ -88,5 +88,5 @@ def test_redaction_masks_nested_credentials_and_authorization():
     safe = redact(value)
     assert safe["outer"]["password"] == "[REDACTED]"
     assert safe["outer"]["safe"] == "keep"
-    assert safe["authorization"] == "Bearer [REDACTED]"
+    assert safe["authorization"] == "[REDACTED]"
     assert safe["items"][0]["api_key"] == "[REDACTED]"
