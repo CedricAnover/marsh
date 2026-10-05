@@ -47,8 +47,6 @@ class ProviderCapabilities:
 
 
 @dataclass(frozen=True)
-
-@dataclass(frozen=True)
 class CapabilityRequirement:
     """Provider-independent capability requirements for admission."""
 
@@ -75,6 +73,7 @@ class CapabilityMatch:
         return not self.missing
 
 
+@dataclass(frozen=True)
 class ProviderConfig:
     """Provider selection/configuration without provider-specific semantics."""
 
