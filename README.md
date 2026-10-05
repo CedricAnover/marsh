@@ -537,6 +537,27 @@ The existing DAG API currently provides dependency execution but does not provid
 
 Applications requiring the canonical workflow semantics should prefer `Workflow` and `Task`.
 
+## CLI inspection and extensions (v0.3.9)
+
+Marsh now provides a read-only CLI boundary for inspecting canonical workflow
+semantics without executing work:
+
+    marsh inspect workflow.json
+    marsh inspect workflow.json --json
+    marsh plugins list
+    marsh plugins list --json
+
+Inspection reuses the canonical validation, planning, and identity APIs. It does
+not execute a workflow or expose provider credentials. Machine-readable output is
+deterministic JSON.
+
+Optional integrations are discovered through the standard Python entry-point group
+`marsh.extensions`. Discovery is deterministic and performs compatibility checks
+before loading extension code. Extensions must declare the
+`Marsh-Extension-Contract` metadata field. See
+[the v0.3.9 CLI guide](docs/cli-v0.3.9.md) and
+[the extension guide](docs/extension-guide-v0.3.9.md).
+
 ## Architecture
 
 For the implemented architecture and design boundaries, see [`docs/architecture.md`](docs/architecture.md).
@@ -547,7 +568,7 @@ The current release line intentionally has several boundaries:
 
 - The canonical runtime is local and sequential.
 - General task-to-task result/data passing is not implemented yet.
-- The canonical workflow API does not currently provide a standalone CLI.
+- The canonical workflow API now has a read-only inspection CLI; it does not provide execution controls.
 - YAML authoring is not currently provided.
 - Callable operations are Python-specific and are not portable JSON definitions.
 - Remote and container execution remain available through existing APIs rather than being part of the canonical local runtime.
