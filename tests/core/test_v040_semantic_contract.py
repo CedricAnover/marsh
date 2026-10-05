@@ -44,4 +44,4 @@ def test_v040_lifecycle_transition_matrix_is_explicit():
 
 def test_v040_invalid_status_value_is_rejected():
     with pytest.raises(ValueError):
-        ProcessStatus("unknown")
+        ProcessStatus("not-a-status")
