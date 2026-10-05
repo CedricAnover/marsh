@@ -284,6 +284,10 @@ class LocalProcess:
                 if self._started_at is not None
                 else None
             ),
+            metadata={
+                "cancellation": "confirmed" if status is ProcessStatus.CANCELLED else "not_requested" if not self._cancel_requested else "requested",
+                "timeout": status is ProcessStatus.TIMED_OUT,
+            },
         )
         return self._result
 
