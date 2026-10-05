@@ -3,7 +3,7 @@ import sys
 import pytest
 
 from marsh.core.domain import ProcessSpec, ProcessStatus
-from marsh.core.providers import LocalProvider, ProviderRegistry, UnsupportedCapabilityError
+from marsh.core.providers import LocalProvider, ProviderConfig, ProviderRegistry, UnsupportedCapabilityError
 
 
 @pytest.fixture
@@ -60,6 +60,22 @@ def test_local_provider_conformance_capability_mismatch_is_pre_dispatch():
 
     with pytest.raises(UnsupportedCapabilityError):
         registry.resolve(
-            type("Config", (), {"name": "local"})(),
+            ProviderConfig("local"),
             ["process.stream"],
         )
+
+
+def test_local_provider_conformance_cancellation_is_confirmed(local_provider):
+    process = local_provider.create_machine().create_process(
+        ProcessSpec(
+            executable=sys.executable,
+            arguments=("-c", "import time; time.sleep(1)"),
+        )
+    )
+
+    process.start()
+    process.cancel()
+    result = process.wait()
+
+    assert result.status is ProcessStatus.CANCELLED
+    assert result.metadata["cancellation"] == "confirmed"
