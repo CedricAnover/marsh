@@ -18,14 +18,8 @@ def test_v040_terminal_outcomes_are_explicit_and_non_regressing():
         assert not can_transition(status, ProcessStatus.RUNNING)
 
 
-def test_v040_active_lifecycle_has_no_unlisted_transition():
-    active = (
-        ProcessStatus.CREATED,
-        ProcessStatus.STARTING,
-        ProcessStatus.RUNNING,
-        ProcessStatus.STOPPING,
-    )
-
+def test_v040_lifecycle_transition_matrix_is_explicit():
+    statuses = tuple(ProcessStatus)
     allowed = {
         (ProcessStatus.CREATED, ProcessStatus.STARTING),
         (ProcessStatus.CREATED, ProcessStatus.CANCELLED),
@@ -42,9 +36,9 @@ def test_v040_active_lifecycle_has_no_unlisted_transition():
         (ProcessStatus.STOPPING, ProcessStatus.CANCELLED),
     }
 
-    for current in active:
-        for target in active:
-            assert (current, target) in allowed or not can_transition(current, target)
+    for current in statuses:
+        for target in statuses:
+            assert can_transition(current, target) is ((current, target) in allowed)
 
 
 def test_v040_invalid_status_value_is_rejected():
