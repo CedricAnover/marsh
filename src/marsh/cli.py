@@ -79,8 +79,9 @@ def _print(value: Any, machine: bool) -> None:
         print("Execution: not performed")
         return
     for item in safe:
+        target = f" ({item['value']})" if "value" in item else ""
         print(
-            f"{item['name']} [{item['status']}]"
+            f"{item['name']}{target} [{item['status']}]"
             + (f": {item['reason']}" if item["reason"] else "")
         )
 
