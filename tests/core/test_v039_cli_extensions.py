@@ -74,3 +74,19 @@ def test_secret_safe_cli_error(tmp_path, capsys):
     path.write_text('{"token":"super-secret",', encoding="utf-8")
     assert main(["inspect", str(path)]) != EXIT_SUCCESS
     assert "super-secret" not in capsys.readouterr().err
+
+
+def test_redaction_masks_nested_credentials_and_authorization():
+    from marsh.diagnostics import redact
+
+    value = {
+        "outer": {"password": "secret-value", "safe": "keep"},
+        "authorization": "Bearer abc123",
+        "items": [{"api_key": "another-secret"}],
+    }
+
+    safe = redact(value)
+    assert safe["outer"]["password"] == "[REDACTED]"
+    assert safe["outer"]["safe"] == "keep"
+    assert safe["authorization"] == "Bearer [REDACTED]"
+    assert safe["items"][0]["api_key"] == "[REDACTED]"
