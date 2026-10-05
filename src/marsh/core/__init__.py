@@ -33,6 +33,8 @@ from marsh.core.providers import (
     LocalProvider,
     Provider,
     ProviderCapabilities,
+    CapabilityMatch,
+    CapabilityRequirement,
     ProviderConfig,
     ProviderConfigurationError,
     ProviderError,
