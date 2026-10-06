@@ -3,10 +3,13 @@ import pytest
 from marsh.core.domain import ProcessSpec, ProcessStatus, Result, Workflow, Task
 from marsh.core.policies import FailurePolicy, ResourcePolicy, RetryPolicy, TimeoutPolicy
 from marsh.core.providers import (
+    CapabilityDiscovery,
+    CapabilityState,
     LocalProvider,
     ProviderCapabilities,
     Provider,
     ProviderRegistry,
+    ProviderUnavailableError,
     UnsupportedCapabilityError,
 )
 
@@ -78,6 +81,7 @@ def test_local_provider_executes_existing_process_contract():
     process.start()
     assert process.wait().status is ProcessStatus.COMPLETED
 
+
 def test_timeout_policy_only_applies_when_no_explicit_timeout_exists():
     policy = TimeoutPolicy(5.0)
     assert policy.resolve(None) == 5.0
@@ -85,3 +89,116 @@ def test_timeout_policy_only_applies_when_no_explicit_timeout_exists():
 
     with pytest.raises(ValueError, match="greater than zero"):
         TimeoutPolicy(0)
+
+
+class _DiscoveryProvider:
+    capabilities = ProviderCapabilities({"process.start", "process.wait"})
+
+    def __init__(self, discovery):
+        self.discovery = discovery
+
+    def discover_capabilities(self):
+        return self.discovery
+
+    def create_machine(self, **kwargs):
+        return object()
+
+
+@pytest.mark.parametrize(
+    ("discovery", "required", "state", "missing"),
+    [
+        (
+            CapabilityDiscovery.supported({"process.start", "process.wait"}),
+            {"process.start"},
+            CapabilityState.SUPPORTED,
+            set(),
+        ),
+        (
+            CapabilityDiscovery.supported({"process.start"}),
+            {"process.start", "process.wait"},
+            CapabilityState.UNSUPPORTED,
+            {"process.wait"},
+        ),
+        (
+            CapabilityDiscovery.unavailable("provider offline"),
+            {"process.start"},
+            CapabilityState.UNAVAILABLE,
+            {"process.start"},
+        ),
+        (
+            CapabilityDiscovery.indeterminate("discovery timed out"),
+            {"process.start"},
+            CapabilityState.INDETERMINATE,
+            {"process.start"},
+        ),
+    ],
+)
+def test_capability_negotiation_normalizes_discovery_states(
+    discovery, required, state, missing
+):
+    registry = ProviderRegistry()
+    registry.register("provider", _DiscoveryProvider(discovery))
+
+    match = registry.negotiate("provider", required)
+
+    assert match.state is state
+    assert match.missing == frozenset(missing)
+    assert match.to_dict()["state"] == state.value
+    assert tuple(match.to_dict()["required"]) == tuple(sorted(required))
+
+
+def test_capability_discovery_is_deterministic_and_does_not_load_provider_code_for_legacy_provider():
+    registry = ProviderRegistry()
+    registry.register("provider", _DiscoveryProvider(
+        CapabilityDiscovery.supported({"z.capability", "a.capability"})
+    ))
+
+    first = registry.discover("provider").to_dict()
+    second = registry.discover("provider").to_dict()
+
+    assert first == second
+    assert first["capabilities"] == ("a.capability", "z.capability")
+
+
+def test_unavailable_capability_discovery_is_not_treated_as_supported():
+    registry = ProviderRegistry()
+    registry.register(
+        "provider",
+        _DiscoveryProvider(CapabilityDiscovery.unavailable("offline")),
+    )
+
+    with pytest.raises(ProviderUnavailableError, match="offline"):
+        registry.require("provider", {"process.start"})
+
+
+def test_legacy_provider_capabilities_are_normalized_as_supported():
+    class LegacyProvider:
+        capabilities = ProviderCapabilities({"process.start"})
+
+        def create_machine(self, **kwargs):
+            return object()
+
+    registry = ProviderRegistry({"legacy": LegacyProvider()})
+
+    assert registry.discover("legacy").state is CapabilityState.SUPPORTED
+    assert registry.require("legacy", {"process.start"})
+
+
+def test_provider_discovery_exceptions_become_indeterminate():
+    class FailingProvider:
+        capabilities = ProviderCapabilities({"process.start"})
+
+        def discover_capabilities(self):
+            raise RuntimeError("discovery failed")
+
+        def create_machine(self, **kwargs):
+            return object()
+
+    registry = ProviderRegistry({"failing": FailingProvider()})
+
+    match = registry.negotiate("failing", {"process.start"})
+
+    assert match.state is CapabilityState.INDETERMINATE
+    assert match.reason == "discovery failed"
+    with pytest.raises(UnsupportedCapabilityError):
+        registry.require("failing", {"process.start"})
