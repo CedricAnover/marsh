@@ -329,3 +329,25 @@ def test_heterogeneous_provider_matrix_preserves_uncertainty(
     assert not match.satisfied
     with pytest.raises(expected_exception):
         registry.require("uncertain", {"process.start"})
+
+
+def test_minimal_core_import_does_not_load_optional_provider_dependencies():
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import sys; import marsh; import marsh.core; "
+                "assert 'docker' not in sys.modules; "
+                "assert 'fabric' not in sys.modules"
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.stderr == ""
