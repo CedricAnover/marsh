@@ -105,13 +105,22 @@ def test_provider_conformance_matrix_has_equivalent_capability_admission(provide
     assert match.to_dict()["provider"] == name
 
 
-def test_provider_conformance_matrix_preserves_provider_unavailability():
+def test_provider_conformance_matrix_preserves_provider_unavailability(monkeypatch):
     from marsh.providers.docker_provider import DockerProvider
+
+    real_import = __import__
+
+    def guarded_import(name, *args, **kwargs):
+        if name == "docker" or name.startswith("docker."):
+            raise ModuleNotFoundError("docker intentionally unavailable")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.__import__", guarded_import)
 
     provider = DockerProvider()
     registry = ProviderRegistry({"docker": provider})
-
     match = registry.negotiate("docker", {"machine.create"})
 
-    assert match.state.value == "supported"
-    assert match.missing == frozenset()
+    assert match.state.value == "unavailable"
+    assert not match.satisfied
+    assert "docker" in (match.reason or "")
