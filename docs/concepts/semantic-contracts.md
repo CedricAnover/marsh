@@ -88,7 +88,7 @@ Minimum negative-path coverage includes timeout, cancellation, cleanup failure, 
 
 The kernel remains standard-library-first. Optional infrastructure dependencies belong behind explicit provider/adapter boundaries.
 
-## v0.4.0 non-goals
+## Non-goals
 
 - remote transport implementation;
 - distributed control plane;
@@ -98,7 +98,7 @@ The kernel remains standard-library-first. Optional infrastructure dependencies 
 - mandatory new runtime dependencies;
 - generalized persistence/event sourcing.
 
-## v0.4.1 remote boundary
+## Remote boundary
 
 v0.4.1 implements the minimum transport-neutral remote boundary:
 
@@ -126,7 +126,7 @@ Provider capability discovery is observational and normalized before admission o
 Legacy providers exposing only `capabilities` remain compatible; the registry normalizes that static declaration as a supported discovery result. Provider-specific discovery mechanisms stay behind the provider boundary.
 
 
-## v0.4.2 provider/adapter hardening
+## Provider/adapter hardening
 
 v0.4.2 makes the capability and provider boundary implementation-backed across the supported provider surface.
 
