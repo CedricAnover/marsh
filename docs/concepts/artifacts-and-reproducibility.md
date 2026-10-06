@@ -60,6 +60,12 @@ Identical bytes deduplicate to the same content identity. Concurrent writers con
 
 Artifact persistence is opt-in. The normal runtime does not create an artifact directory unless an ArtifactStore is supplied.
 
+## Recovery verification
+
+A recovery path must tolerate the same narrow transient boundary conditions that can make its authoritative postcondition temporarily unreadable. Verification retries are bounded and deterministic, and only explicitly classified transient exceptions are retried. Retry exhaustion does not fabricate success: the unresolved operation remains ambiguous and retains the original operation failure.
+
+This rule complements the ArtifactStore-specific filesystem retry policy; it does not introduce a generic recovery manager or second runtime.
+
 ## Provenance
 
 Provenance is an explicit allow-list rather than an environment dump.
