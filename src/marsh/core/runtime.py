@@ -26,6 +26,7 @@ from marsh.core.domain import (
 )
 from marsh.core.observability import EventType, Observer, RuntimeEvent, emit_event
 from marsh.core.policies import ExecutionPolicy, evaluate_policy
+from marsh.core.remote import MachineConnection
 from marsh.core.scheduler import AsyncScheduler, ProcessScheduler, ThreadScheduler
 
 
@@ -304,6 +305,30 @@ class LocalProcess:
 
 class LocalMachine:
     """Machine adapter that materializes local subprocesses."""
+
+    @property
+    def machine_id(self) -> str:
+        return "local"
+
+    @property
+    def capabilities(self) -> frozenset[str]:
+        return frozenset(
+            {
+                "machine.create",
+                "process.start",
+                "process.wait",
+                "process.poll",
+                "process.stop",
+                "process.terminate",
+                "process.kill",
+                "process.cancel",
+                "process.result",
+            }
+        )
+
+    @property
+    def connection(self) -> MachineConnection | None:
+        return None
 
     def create_process(self, spec: ProcessSpec) -> LocalProcess:
         return LocalProcess(spec)
