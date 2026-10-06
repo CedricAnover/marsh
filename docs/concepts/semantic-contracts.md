@@ -124,3 +124,21 @@ Provider capability discovery is observational and normalized before admission o
 `ProviderRegistry.negotiate()` returns a deterministic `CapabilityMatch` containing the normalized requirement, advertised capabilities, missing capabilities, state, and optional reason. Unsupported requirements are rejected before provider dispatch when authoritative information exists. Unavailable or indeterminate discovery never fabricates support.
 
 Legacy providers exposing only `capabilities` remain compatible; the registry normalizes that static declaration as a supported discovery result. Provider-specific discovery mechanisms stay behind the provider boundary.
+
+
+## v0.4.2 provider/adapter hardening
+
+v0.4.2 makes the capability and provider boundary implementation-backed across the supported provider surface.
+
+- CapabilityState distinguishes supported, unsupported, unavailable, and indeterminate discovery.
+- CapabilityDiscovery normalizes provider-specific discovery into a provider-neutral observation.
+- CapabilityMatch provides deterministic admission evidence: required, available, missing, state, and reason.
+- Unsupported requirements are rejected before provider dispatch when authoritative capability information exists.
+- Unavailable or indeterminate discovery never fabricates support.
+- Legacy providers that expose only static capabilities remain compatible.
+- Docker capability discovery reports unavailable when the optional Docker dependency is missing rather than making core imports depend on Docker.
+- Heterogeneous Local/Docker conformance covers capability admission, optional-dependency absence, provider exceptions, and real Docker integration.
+- Partial provider failure remains adapter-owned and uses the existing bounded postcondition-based recovery primitive; unresolved state remains ambiguous.
+- Provider handles and provider-specific configuration remain opaque to canonical capability serialization and semantic identity.
+
+The v0.4.2 boundary remains standard-library-first: Docker and Fabric remain optional integrations, and no production distributed transport or second runtime/scheduler is introduced.
