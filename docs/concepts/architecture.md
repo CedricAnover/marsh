@@ -263,7 +263,7 @@ Storage paths and runtime objects are not semantic identity.
 
 ### ArtifactStore boundary
 
-ArtifactStore is a narrow capability. LocalArtifactStore uses content-addressed paths, manifests, digest/size verification, secure temporary files, and atomic finalization. Remote object stores are not required by the canonical runtime.
+ArtifactStore is a narrow capability. LocalArtifactStore uses content-addressed paths, manifests, digest/size verification, secure temporary files, and atomic finalization. Existing destinations and finalization races are resolved by verified postconditions, with bounded retries only for narrow transient filesystem errors. Remote object stores are not required by the canonical runtime.
 
 ### Compatibility boundary
 

@@ -81,20 +81,28 @@ assert store.get(ref) == b"cross-process artifact"
     )
 
 
-def test_artifact_store_recovers_when_windows_replace_reports_access_denied_after_deduplication(tmp_path, monkeypatch):
+def test_artifact_store_recovers_when_windows_replace_reports_access_denied_after_deduplication(
+    tmp_path, monkeypatch
+):
     store = LocalArtifactStore(tmp_path)
-    original_replace = __import__("marsh.core.artifact_store", fromlist=["os"]).os.replace
+    original_replace = __import__(
+        "marsh.core.artifact_store", fromlist=["os"]
+    ).os.replace
     destination_created = False
 
     def replace_with_windows_collision(temp_name, destination):
         nonlocal destination_created
-        if not destination_created and str(temp_name).startswith(str(store.tmp / "artifact-")):
+        if not destination_created and str(temp_name).startswith(
+            str(store.tmp / "artifact-")
+        ):
             destination.write_bytes(__import__("pathlib").Path(temp_name).read_bytes())
             destination_created = True
             raise PermissionError(5, "Access is denied")
         return original_replace(temp_name, destination)
 
-    monkeypatch.setattr("marsh.core.artifact_store.os.replace", replace_with_windows_collision)
+    monkeypatch.setattr(
+        "marsh.core.artifact_store.os.replace", replace_with_windows_collision
+    )
 
     ref = store.put(b"windows deduplication")
 
@@ -142,3 +150,85 @@ def test_artifact_store_retries_transient_get_permission_error(tmp_path, monkeyp
 
     assert stored.digest == ref.digest
     assert attempts == 3
+
+
+def test_artifact_store_rejects_corrupt_existing_destination(tmp_path):
+    store = LocalArtifactStore(tmp_path)
+    ref = store.put(b"destination integrity")
+    store.path_for(ref).write_bytes(b"corrupt")
+
+    try:
+        store.put(b"destination integrity")
+    except ValueError as exc:
+        assert "artifact integrity" in str(exc)
+    else:
+        raise AssertionError("corrupt existing artifact was accepted")
+
+
+def test_artifact_store_verifies_manifest_after_transient_finalization_error(
+    tmp_path, monkeypatch
+):
+    store = LocalArtifactStore(tmp_path)
+    ref = store.put(b"manifest finalization")
+    manifest_path = store.manifest_path_for(ref)
+    manifest_path.unlink()
+    original_replace = __import__(
+        "marsh.core.artifact_store", fromlist=["os"]
+    ).os.replace
+    replacement_attempts = 0
+
+    def replace_with_postcondition_race(temp_name, destination):
+        nonlocal replacement_attempts
+        if destination == manifest_path:
+            replacement_attempts += 1
+            original_replace(temp_name, destination)
+            raise PermissionError(13, "Access is denied")
+        return original_replace(temp_name, destination)
+
+    monkeypatch.setattr(
+        "marsh.core.artifact_store.os.replace", replace_with_postcondition_race
+    )
+
+    stored = store.put(b"manifest finalization")
+
+    assert stored.digest == ref.digest
+    assert json.loads(manifest_path.read_text(encoding="utf-8"))["digest"] == ref.digest
+    assert replacement_attempts == 1
+
+
+def test_artifact_store_rejects_invalid_manifest_after_finalization_error(
+    tmp_path, monkeypatch
+):
+    store = LocalArtifactStore(tmp_path)
+    ref = store.put(b"manifest mismatch")
+    manifest_path = store.manifest_path_for(ref)
+    manifest_path.unlink()
+    original_replace = __import__(
+        "marsh.core.artifact_store", fromlist=["os"]
+    ).os.replace
+
+    def replace_with_invalid_postcondition(temp_name, destination):
+        if destination == manifest_path:
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "digest": ref.digest,
+                        "size": ref.size + 1,
+                        "media_type": ref.media_type,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            raise PermissionError(13, "Access is denied")
+        return original_replace(temp_name, destination)
+
+    monkeypatch.setattr(
+        "marsh.core.artifact_store.os.replace", replace_with_invalid_postcondition
+    )
+
+    try:
+        store.put(b"manifest mismatch")
+    except ValueError as exc:
+        assert "manifest integrity" in str(exc)
+    else:
+        raise AssertionError("invalid manifest postcondition was accepted")
