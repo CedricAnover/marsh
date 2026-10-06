@@ -111,3 +111,16 @@ v0.4.1 implements the minimum transport-neutral remote boundary:
 The reference `SocketMachineConnection` uses standard-library TCP/JSON framing for conformance evidence only. It is not a production transport commitment.
 
 Remote execution must preserve the same identity, lifecycle, ambiguity, cancellation, artifact, and reconciliation vocabulary rather than redefine it.
+
+## Capability discovery and negotiation
+
+Provider capability discovery is observational and normalized before admission or dispatch. A discovery result has one of four states:
+
+- **supported** — authoritative discovery reports a capability set;
+- **unsupported** — authoritative discovery completed, but one or more requested capabilities are missing;
+- **unavailable** — the provider cannot currently be queried or is not registered;
+- **indeterminate** — discovery failed without enough evidence to establish support or lack of support.
+
+`ProviderRegistry.negotiate()` returns a deterministic `CapabilityMatch` containing the normalized requirement, advertised capabilities, missing capabilities, state, and optional reason. Unsupported requirements are rejected before provider dispatch when authoritative information exists. Unavailable or indeterminate discovery never fabricates support.
+
+Legacy providers exposing only `capabilities` remain compatible; the registry normalizes that static declaration as a supported discovery result. Provider-specific discovery mechanisms stay behind the provider boundary.
