@@ -37,9 +37,7 @@ class LocalArtifactStore:
 
     def path_for(self, ref: ArtifactRef) -> Path:
         digest = ref.digest.removeprefix("sha256:")
-        if len(digest) != 64 or any(
-            char not in "0123456789abcdef" for char in digest
-        ):
+        if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
             raise ValueError("invalid artifact digest")
         return self.objects / digest[:2] / digest[2:]
 
@@ -56,6 +54,17 @@ class LocalArtifactStore:
                     raise
                 time.sleep(_READ_RETRY_DELAY_SECONDS * (attempt + 1))
         raise AssertionError("unreachable")
+
+    def _verify_manifest(self, ref: ArtifactRef) -> None:
+        """Verify the persisted manifest against the artifact reference."""
+        manifest_path = self.manifest_path_for(ref)
+        if not manifest_path.is_file():
+            raise FileNotFoundError(manifest_path)
+        manifest = json.loads(_read_text_with_retry(manifest_path))
+        if manifest.get("digest") != ref.digest or (manifest.get("size") != ref.size):
+            raise ValueError("artifact manifest integrity verification failed")
+        if manifest.get("media_type") != ref.media_type:
+            raise ValueError("artifact metadata conflict")
 
     def put(
         self,
@@ -99,16 +108,7 @@ class LocalArtifactStore:
         }
         manifest_path = self.manifest_path_for(ref)
         if manifest_path.exists():
-            existing = json.loads(_read_text_with_retry(manifest_path))
-            if (
-                existing.get("digest") != digest
-                or existing.get("size") != len(data)
-            ):
-                raise ValueError(
-                    "artifact manifest integrity verification failed"
-                )
-            if existing.get("media_type") != media_type:
-                raise ValueError("artifact metadata conflict")
+            self._verify_manifest(ref)
         else:
             fd, temp_name = tempfile.mkstemp(
                 prefix="manifest-", dir=self.tmp, text=True
@@ -129,6 +129,7 @@ class LocalArtifactStore:
                 except PermissionError:
                     if not manifest_path.exists():
                         raise
+                    self._verify_manifest(ref)
             finally:
                 try:
                     os.unlink(temp_name)
@@ -152,14 +153,7 @@ class LocalArtifactStore:
             raise ValueError("artifact integrity verification failed")
         manifest_path = self.manifest_path_for(ref)
         if manifest_path.is_file():
-            manifest = json.loads(_read_text_with_retry(manifest_path))
-            if (
-                manifest.get("digest") != ref.digest
-                or manifest.get("size") != ref.size
-            ):
-                raise ValueError(
-                    "artifact manifest integrity verification failed"
-                )
+            self._verify_manifest(ref)
         return data
 
     def exists(self, ref: ArtifactRef) -> bool:
@@ -174,6 +168,4 @@ class LocalArtifactStore:
         self.manifest_path_for(ref).unlink(missing_ok=True)
 
     def object_count(self) -> int:
-        return sum(
-            1 for path in self.objects.glob("*/*") if path.is_file()
-        )
+        return sum(1 for path in self.objects.glob("*/*") if path.is_file())
