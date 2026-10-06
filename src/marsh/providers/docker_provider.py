@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from marsh.core.domain import Machine, Process, ProcessSpec, ProcessStatus, Result, can_transition
 from marsh.core.providers import (
+    CapabilityDiscovery,
     ProviderCapabilities,
     ProviderConfigurationError,
     ProviderError,
@@ -262,6 +263,15 @@ class DockerProvider:
                 "process.result",
             }
         )
+
+    def discover_capabilities(self) -> CapabilityDiscovery:
+        try:
+            import docker  # noqa: F401
+        except ImportError:
+            return CapabilityDiscovery.unavailable(
+                "Docker provider requires the 'docker' package"
+            )
+        return CapabilityDiscovery.supported(self.capabilities)
 
     def create_machine(self, **kwargs) -> Machine:
         allowed = {"image", "client_kwargs"}

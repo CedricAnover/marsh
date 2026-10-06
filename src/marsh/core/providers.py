@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, Mapping, Protocol, runtime_checkable
+from enum import Enum
+from typing import Any, Mapping, Protocol, runtime_checkable
 
 from marsh.core.domain import Machine
 
@@ -22,6 +24,15 @@ class ProviderUnavailableError(ProviderError):
 
 class UnsupportedCapabilityError(ProviderError, ValueError):
     """Raised when a provider cannot satisfy a required capability."""
+
+
+class CapabilityState(str, Enum):
+    """Authoritative state of provider capability discovery."""
+
+    SUPPORTED = "supported"
+    UNSUPPORTED = "unsupported"
+    UNAVAILABLE = "unavailable"
+    INDETERMINATE = "indeterminate"
 
 
 @dataclass(frozen=True)
@@ -47,6 +58,44 @@ class ProviderCapabilities:
 
 
 @dataclass(frozen=True)
+class CapabilityDiscovery:
+    """Normalized, observational provider capability discovery result."""
+
+    state: CapabilityState
+    capabilities: ProviderCapabilities
+    reason: str | None = None
+
+    @classmethod
+    def supported(cls, capabilities: Iterable[str]) -> "CapabilityDiscovery":
+        return cls(CapabilityState.SUPPORTED, ProviderCapabilities(capabilities))
+
+    @classmethod
+    def unsupported(
+        cls, capabilities: Iterable[str], reason: str | None = None
+    ) -> "CapabilityDiscovery":
+        return cls(
+            CapabilityState.UNSUPPORTED,
+            ProviderCapabilities(capabilities),
+            reason,
+        )
+
+    @classmethod
+    def unavailable(cls, reason: str | None = None) -> "CapabilityDiscovery":
+        return cls(CapabilityState.UNAVAILABLE, ProviderCapabilities(()), reason)
+
+    @classmethod
+    def indeterminate(cls, reason: str | None = None) -> "CapabilityDiscovery":
+        return cls(CapabilityState.INDETERMINATE, ProviderCapabilities(()), reason)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "state": self.state.value,
+            "capabilities": tuple(self.capabilities),
+            "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True)
 class CapabilityRequirement:
     """Provider-independent capability requirements for admission."""
 
@@ -67,10 +116,28 @@ class CapabilityMatch:
     required: frozenset[str]
     available: frozenset[str]
     missing: frozenset[str]
+    state: CapabilityState
+    reason: str | None = None
 
     @property
     def satisfied(self) -> bool:
-        return not self.missing
+        return self.state is CapabilityState.SUPPORTED and not self.missing
+
+    @property
+    def admissible(self) -> bool:
+        """Return whether authoritative discovery permits provider dispatch."""
+        return self.satisfied
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "provider": self.provider,
+            "required": tuple(sorted(self.required)),
+            "available": tuple(sorted(self.available)),
+            "missing": tuple(sorted(self.missing)),
+            "state": self.state.value,
+            "reason": self.reason,
+            "satisfied": self.satisfied,
+        }
 
 
 @dataclass(frozen=True)
@@ -121,6 +188,9 @@ class LocalProvider:
             }
         )
 
+    def discover_capabilities(self) -> CapabilityDiscovery:
+        return CapabilityDiscovery.supported(self.capabilities)
+
     def create_machine(self, **kwargs) -> Machine:
         from marsh.core.runtime import LocalMachine
 
@@ -129,6 +199,28 @@ class LocalProvider:
                 f"unsupported local provider options: {sorted(kwargs)}"
             )
         return LocalMachine()
+
+
+def _discover(provider: Provider) -> CapabilityDiscovery:
+    """Normalize legacy and explicit provider capability discovery."""
+    discover = getattr(provider, "discover_capabilities", None)
+    if discover is None:
+        return CapabilityDiscovery.supported(provider.capabilities)
+
+    try:
+        result = discover()
+    except ProviderUnavailableError as exc:
+        return CapabilityDiscovery.unavailable(str(exc))
+    except Exception as exc:
+        return CapabilityDiscovery.indeterminate(str(exc))
+
+    if isinstance(result, CapabilityDiscovery):
+        return result
+    if isinstance(result, ProviderCapabilities):
+        return CapabilityDiscovery.supported(result.values)
+    if isinstance(result, Iterable) and not isinstance(result, (str, bytes)):
+        return CapabilityDiscovery.supported(result)
+    raise TypeError("provider capability discovery returned an unsupported value")
 
 
 class ProviderRegistry:
@@ -154,12 +246,18 @@ class ProviderRegistry:
     def get(self, name: str) -> Provider | None:
         return self._providers.get(name.strip())
 
+    def discover(self, name: str) -> CapabilityDiscovery:
+        provider = self.get(name)
+        if provider is None:
+            return CapabilityDiscovery.unavailable("provider is not registered")
+        return _discover(provider)
+
     def find(self, capabilities: Iterable[str] = ()) -> tuple[tuple[str, Provider], ...]:
         required = frozenset(capabilities)
         return tuple(
             (name, self._providers[name])
             for name in sorted(self._providers)
-            if self._providers[name].capabilities.satisfies(required)
+            if self.negotiate(name, required).satisfied
         )
 
     def require(
@@ -167,14 +265,19 @@ class ProviderRegistry:
         name: str,
         capabilities: Iterable[str] = (),
     ) -> Provider:
+        match = self.negotiate(name, capabilities)
         provider = self.get(name)
         if provider is None:
             raise KeyError(name)
-        required = frozenset(capabilities)
-        if not provider.capabilities.satisfies(required):
-            missing = sorted(required - provider.capabilities.values)
+        if match.state is CapabilityState.UNAVAILABLE:
+            raise ProviderUnavailableError(
+                match.reason or f"provider {name!r} is unavailable"
+            )
+        if match.state is not CapabilityState.SUPPORTED or match.missing:
+            missing = sorted(match.missing)
+            suffix = f": {', '.join(missing)}" if missing else ""
             raise UnsupportedCapabilityError(
-                f"provider {name!r} does not support capabilities: {', '.join(missing)}"
+                f"provider {name!r} cannot satisfy capabilities{suffix}"
             )
         return provider
 
@@ -183,16 +286,20 @@ class ProviderRegistry:
         name: str,
         capabilities: Iterable[str] = (),
     ) -> CapabilityMatch:
-        provider = self.get(name)
+        provider_name = name.strip()
         required = CapabilityRequirement(capabilities).required
-        available = (
-            provider.capabilities.values if provider is not None else frozenset()
-        )
+        discovery = self.discover(provider_name)
+        missing = frozenset(required - discovery.capabilities.values)
+        state = discovery.state
+        if state is CapabilityState.SUPPORTED and missing:
+            state = CapabilityState.UNSUPPORTED
         return CapabilityMatch(
-            provider=name.strip(),
+            provider=provider_name,
             required=required,
-            available=frozenset(available),
-            missing=frozenset(required - available),
+            available=discovery.capabilities.values,
+            missing=missing,
+            state=state,
+            reason=discovery.reason,
         )
 
     def resolve(
@@ -204,9 +311,14 @@ class ProviderRegistry:
         provider = self.get(config.name)
         if provider is None:
             raise KeyError(config.name)
+        if match.state is CapabilityState.UNAVAILABLE:
+            raise ProviderUnavailableError(
+                match.reason or f"provider {config.name!r} is unavailable"
+            )
         if not match.satisfied:
             missing = sorted(match.missing)
+            suffix = f": {', '.join(missing)}" if missing else ""
             raise UnsupportedCapabilityError(
-                f"provider {config.name!r} does not support capabilities: {', '.join(missing)}"
+                f"provider {config.name!r} cannot satisfy capabilities{suffix}"
             )
         return provider

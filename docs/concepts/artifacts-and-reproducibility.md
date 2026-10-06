@@ -56,9 +56,15 @@ LocalArtifactStore is content-addressed:
 
 Writes use temporary files and atomic finalization. Existing objects are verified rather than silently accepted as valid. Reads verify both declared size and SHA-256 content identity, and manifest corruption is rejected.
 
-Identical bytes deduplicate to the same content identity.
+Identical bytes deduplicate to the same content identity. Concurrent writers converge on the same object without overwriting a valid artifact. Narrow transient `PermissionError` conditions during finalization or verification use the existing bounded read-retry policy; recovery succeeds only after the authoritative artifact or manifest postcondition is verified. Retry exhaustion preserves the underlying failure.
 
 Artifact persistence is opt-in. The normal runtime does not create an artifact directory unless an ArtifactStore is supplied.
+
+## Recovery verification
+
+A recovery path must tolerate the same narrow transient boundary conditions that can make its authoritative postcondition temporarily unreadable. Verification retries are bounded and deterministic, and only explicitly classified transient exceptions are retried. Retry exhaustion does not fabricate success: the unresolved operation remains ambiguous and retains the original operation failure.
+
+This rule complements the ArtifactStore-specific filesystem retry policy; it does not introduce a generic recovery manager or second runtime.
 
 ## Provenance
 

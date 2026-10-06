@@ -88,7 +88,7 @@ Minimum negative-path coverage includes timeout, cancellation, cleanup failure, 
 
 The kernel remains standard-library-first. Optional infrastructure dependencies belong behind explicit provider/adapter boundaries.
 
-## v0.4.0 non-goals
+## Non-goals
 
 - remote transport implementation;
 - distributed control plane;
@@ -98,7 +98,7 @@ The kernel remains standard-library-first. Optional infrastructure dependencies 
 - mandatory new runtime dependencies;
 - generalized persistence/event sourcing.
 
-## v0.4.1 remote boundary
+## Remote boundary
 
 v0.4.1 implements the minimum transport-neutral remote boundary:
 
@@ -111,3 +111,34 @@ v0.4.1 implements the minimum transport-neutral remote boundary:
 The reference `SocketMachineConnection` uses standard-library TCP/JSON framing for conformance evidence only. It is not a production transport commitment.
 
 Remote execution must preserve the same identity, lifecycle, ambiguity, cancellation, artifact, and reconciliation vocabulary rather than redefine it.
+
+## Capability discovery and negotiation
+
+Provider capability discovery is observational and normalized before admission or dispatch. A discovery result has one of four states:
+
+- **supported** — authoritative discovery reports a capability set;
+- **unsupported** — authoritative discovery completed, but one or more requested capabilities are missing;
+- **unavailable** — the provider cannot currently be queried or is not registered;
+- **indeterminate** — discovery failed without enough evidence to establish support or lack of support.
+
+`ProviderRegistry.negotiate()` returns a deterministic `CapabilityMatch` containing the normalized requirement, advertised capabilities, missing capabilities, state, and optional reason. Unsupported requirements are rejected before provider dispatch when authoritative information exists. Unavailable or indeterminate discovery never fabricates support.
+
+Legacy providers exposing only `capabilities` remain compatible; the registry normalizes that static declaration as a supported discovery result. Provider-specific discovery mechanisms stay behind the provider boundary.
+
+
+## Provider/adapter hardening
+
+v0.4.2 makes the capability and provider boundary implementation-backed across the supported provider surface.
+
+- CapabilityState distinguishes supported, unsupported, unavailable, and indeterminate discovery.
+- CapabilityDiscovery normalizes provider-specific discovery into a provider-neutral observation.
+- CapabilityMatch provides deterministic admission evidence: required, available, missing, state, and reason.
+- Unsupported requirements are rejected before provider dispatch when authoritative capability information exists.
+- Unavailable or indeterminate discovery never fabricates support.
+- Legacy providers that expose only static capabilities remain compatible.
+- Docker capability discovery reports unavailable when the optional Docker dependency is missing rather than making core imports depend on Docker.
+- Heterogeneous Local/Docker conformance covers capability admission, optional-dependency absence, provider exceptions, and real Docker integration.
+- Partial provider failure remains adapter-owned and uses the existing bounded postcondition-based recovery primitive; unresolved state remains ambiguous.
+- Provider handles and provider-specific configuration remain opaque to canonical capability serialization and semantic identity.
+
+The v0.4.2 boundary remains standard-library-first: Docker and Fabric remain optional integrations, and no production distributed transport or second runtime/scheduler is introduced.

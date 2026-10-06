@@ -212,6 +212,24 @@ Cancellation is a request followed by mechanism-specific stop/terminate/kill and
 The policy evaluator is pure and inspectable. Backend differences must not change the policy decision for the same policy, task metadata, outcome, and control history. Runtime-only callbacks such as cleanup functions remain outside the portable IR serialization boundary.
 
 
+## Recovery and postcondition boundary (v0.4.2)
+
+Postcondition-based recovery is authoritative only when verification itself can tolerate the narrow transient boundary failure that interrupted the original operation. `execute_with_postcondition` never retries the operation blindly; it retries only explicitly classified transient verification exceptions within a bounded budget and delay. A verified postcondition resolves the operation, while retry exhaustion preserves the original operation failure as an ambiguous outcome.
+
+This is a local infrastructure/conformance rule, not a new orchestration layer. It does not alter execution or attempt identity, lifecycle semantics, or provider-independent result contracts.
+
+Plaintext pseudocode:
+
+```text
+operation()
+  success -> RESOLVED(value)
+  failure -> verify postcondition
+               verified -> RESOLVED
+               transient verification failure -> bounded retry
+               non-transient verification failure -> AMBIGUOUS(verification failure)
+               retries exhausted -> AMBIGUOUS(original operation failure)
+```
+
 ## Artifact and identity boundary (v0.3.8)
 
 v0.3.8 extends the existing canonical Workflow IR and runtime rather than introducing a second execution engine.
@@ -263,7 +281,7 @@ Storage paths and runtime objects are not semantic identity.
 
 ### ArtifactStore boundary
 
-ArtifactStore is a narrow capability. LocalArtifactStore uses content-addressed paths, manifests, digest/size verification, secure temporary files, and atomic finalization. Remote object stores are not required by the canonical runtime.
+ArtifactStore is a narrow capability. LocalArtifactStore uses content-addressed paths, manifests, digest/size verification, secure temporary files, and atomic finalization. Existing destinations and finalization races are resolved by verified postconditions, with bounded retries only for narrow transient filesystem errors. Remote object stores are not required by the canonical runtime.
 
 ### Compatibility boundary
 

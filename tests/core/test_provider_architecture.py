@@ -5,6 +5,7 @@ import pytest
 
 from marsh.core.domain import ProcessSpec, ProcessStatus, Workflow, Task
 from marsh.core.providers import (
+    CapabilityState,
     LocalProvider,
     Provider,
     ProviderCapabilities,
@@ -107,6 +108,7 @@ def test_docker_provider_implements_the_same_capability_contract():
     assert provider.capabilities.satisfies(
         {"machine.create", "process.start", "process.wait", "process.result"}
     )
+    assert provider.discover_capabilities().state is CapabilityState.SUPPORTED
 
 
 @pytest.mark.integration
@@ -246,3 +248,21 @@ def test_provider_configuration_is_not_logged_by_default(caplog):
         )
 
     assert secret not in caplog.text
+
+
+def test_docker_provider_reports_unavailable_when_optional_dependency_is_missing(monkeypatch):
+    from marsh.providers.docker_provider import DockerProvider
+
+    real_import = __import__
+
+    def guarded_import(name, *args, **kwargs):
+        if name == "docker" or name.startswith("docker."):
+            raise ModuleNotFoundError("docker intentionally unavailable")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.__import__", guarded_import)
+
+    discovery = DockerProvider().discover_capabilities()
+
+    assert discovery.state is CapabilityState.UNAVAILABLE
+    assert "docker" in (discovery.reason or "")

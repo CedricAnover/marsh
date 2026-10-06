@@ -6,7 +6,7 @@ Marsh separates **workflow definition** from **execution**. Work can be represen
 
 The project is evolving toward a small, dependency-light workflow and execution kernel while preserving its existing command, executor, and DAG APIs.
 
-> **Current release:** v0.4.1 — remote execution readiness. Marsh now exposes a transport-neutral remote execution boundary with machine connection, optional agent, execution substrate, identity-preserving requests, and ambiguity-safe reconciliation. See [the semantic contract](docs/concepts/semantic-contracts.md) and [the v0.4.1 release notes](docs/releases/v0.4.1.md).
+> **Current release:** v0.4.2 — provider & adapter hardening. Marsh now normalizes provider capability discovery and negotiation, preserves explicit unavailable/indeterminate states, and strengthens heterogeneous provider conformance and optional-dependency isolation. See [the semantic contract](docs/concepts/semantic-contracts.md) and [the v0.4.2 release notes](docs/releases/v0.4.2.md).
 
 > **Project status:** Alpha
 
