@@ -351,3 +351,39 @@ def test_minimal_core_import_does_not_load_optional_provider_dependencies():
     )
 
     assert result.stderr == ""
+
+
+def test_provider_specific_handles_and_configuration_do_not_cross_capability_boundary():
+    class ProviderWithOpaqueHandle:
+        capabilities = ProviderCapabilities({"process.start"})
+        handle = "provider-secret-handle"
+
+        def create_machine(self, **kwargs):
+            assert kwargs == {"endpoint": "opaque"}
+            return _ConformanceMachine(Result(stdout=b"ok"))
+
+    registry = ProviderRegistry({"opaque": ProviderWithOpaqueHandle()})
+    match = registry.negotiate("opaque", {"process.start"})
+
+    assert match.satisfied
+    serialized = match.to_dict()
+    assert "handle" not in serialized
+    assert "endpoint" not in serialized
+
+
+def test_provider_specific_discovery_failure_is_normalized_at_adapter_boundary():
+    class ProviderWithFailure:
+        capabilities = ProviderCapabilities({"process.start"})
+
+        def discover_capabilities(self):
+            raise RuntimeError("provider-specific failure")
+
+        def create_machine(self, **kwargs):
+            return _ConformanceMachine(Result(stdout=b"ok"))
+
+    registry = ProviderRegistry({"failing": ProviderWithFailure()})
+
+    match = registry.negotiate("failing", {"process.start"})
+
+    assert match.state is CapabilityState.INDETERMINATE
+    assert match.reason == "provider-specific failure"
