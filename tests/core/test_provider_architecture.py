@@ -5,6 +5,7 @@ import pytest
 
 from marsh.core.domain import ProcessSpec, ProcessStatus, Workflow, Task
 from marsh.core.providers import (
+    CapabilityState,
     LocalProvider,
     Provider,
     ProviderCapabilities,
@@ -107,6 +108,7 @@ def test_docker_provider_implements_the_same_capability_contract():
     assert provider.capabilities.satisfies(
         {"machine.create", "process.start", "process.wait", "process.result"}
     )
+    assert provider.discover_capabilities().state is CapabilityState.SUPPORTED
 
 
 @pytest.mark.integration
