@@ -122,3 +122,23 @@ def test_artifact_store_retries_transient_manifest_read_lock(tmp_path, monkeypat
     monkeypatch.setattr(Path, "read_text", read_text_with_transient_lock)
     assert store.get(ref) == b"manifest lock"
     assert attempts == 3
+
+
+def test_artifact_store_retries_transient_get_permission_error(tmp_path, monkeypatch):
+    store = LocalArtifactStore(tmp_path)
+    ref = store.put(b"retry")
+    original_get = store.get
+    attempts = 0
+
+    def get_with_transient_lock(ref):
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise PermissionError(13, "Access is denied")
+        return original_get(ref)
+
+    monkeypatch.setattr(store, "get", get_with_transient_lock)
+    stored = store.put(b"retry")
+
+    assert stored.digest == ref.digest
+    assert attempts == 3

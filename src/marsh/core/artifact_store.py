@@ -46,6 +46,17 @@ class LocalArtifactStore:
     def manifest_path_for(self, ref: ArtifactRef) -> Path:
         return self.manifests / f"{ref.digest.removeprefix('sha256:')}.json"
 
+    def _get_with_retry(self, ref: ArtifactRef) -> bytes:
+        """Read an artifact across transient Windows file-sharing locks."""
+        for attempt in range(_READ_RETRIES):
+            try:
+                return self.get(ref)
+            except PermissionError:
+                if attempt == _READ_RETRIES - 1:
+                    raise
+                time.sleep(_READ_RETRY_DELAY_SECONDS * (attempt + 1))
+        raise AssertionError("unreachable")
+
     def put(
         self,
         data: bytes,
@@ -61,7 +72,7 @@ class LocalArtifactStore:
         destination.parent.mkdir(parents=True, exist_ok=True)
 
         if destination.exists():
-            self.get(ref)
+            self._get_with_retry(ref)
         else:
             fd, temp_name = tempfile.mkstemp(prefix="artifact-", dir=self.tmp)
             try:
@@ -74,7 +85,7 @@ class LocalArtifactStore:
                 except PermissionError:
                     if not destination.exists():
                         raise
-                    self.get(ref)
+                    self._get_with_retry(ref)
             finally:
                 try:
                     os.unlink(temp_name)
