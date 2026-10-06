@@ -29,18 +29,24 @@ def test_two_docker_containers_communicate_over_user_defined_network():
         )
         # The client retries until the server is listening, avoiding timing sleeps
         # as the readiness mechanism.
-        peer_code = (
-            "import socket,time; "
-            "data=b'conformance'; "
-            "last=None; "
-            "for _ in range(30):\n"
-            "  try:\n"
-            "    s=socket.create_connection(('marsh-v041-server',23456),timeout=1); s.sendall(data); "
-            "    print(s.recv(1024).decode()); s.close(); break\n"
-            "  except OSError as e:\n"
-            "    last=e; time.sleep(0.1)\n"
-            "else: raise last"
-        )
+        peer_code = """import socket
+import time
+
+data = b"conformance"
+last = None
+for _ in range(30):
+    try:
+        s = socket.create_connection(("marsh-v041-server", 23456), timeout=1)
+        s.sendall(data)
+        print(s.recv(1024).decode())
+        s.close()
+        break
+    except OSError as exc:
+        last = exc
+        time.sleep(0.1)
+else:
+    raise last
+"""
         peer = client.containers.run(
             "python:3.12-slim",
             ["python", "-c", peer_code],
