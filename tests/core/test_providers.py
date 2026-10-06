@@ -290,12 +290,12 @@ def test_heterogeneous_provider_matrix_rejects_missing_capabilities_before_dispa
 ):
     registry = ProviderRegistry({"provider": provider})
 
-    match = registry.negotiate("provider", {"process.wait"})
+    match = registry.negotiate("provider", {"capability.never"})
 
     assert match.state is CapabilityState.UNSUPPORTED
-    assert match.missing == frozenset({"process.wait"})
+    assert match.missing == frozenset({"capability.never"})
     with pytest.raises(UnsupportedCapabilityError):
-        registry.require("provider", {"process.wait"})
+        registry.require("provider", {"capability.never"})
 
 
 @pytest.mark.parametrize(
