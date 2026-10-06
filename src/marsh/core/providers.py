@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
+from typing import Any, Mapping, Protocol, runtime_checkable
 
 from marsh.core.domain import Machine
 
