@@ -157,3 +157,42 @@ def test_provider_partial_failure_stays_ambiguous_when_restoration_cannot_be_ver
 
     assert result.status is RecoveryStatus.AMBIGUOUS
     assert state["resource"] == "unknown"
+
+
+def test_provider_partial_failure_recovery_models_adapter_owned_restoration():
+    state = {"resource": "absent"}
+    cleanup_calls = []
+
+    def operation():
+        state["resource"] = "allocated"
+        try:
+            raise RuntimeError("provider failed after allocation")
+        except RuntimeError:
+            cleanup_calls.append(1)
+            state["resource"] = "released"
+            raise
+
+    result = execute_with_postcondition(
+        operation,
+        lambda: state["resource"] == "released",
+    )
+
+    assert result.status is RecoveryStatus.RESOLVED
+    assert state["resource"] == "released"
+    assert cleanup_calls == [1]
+
+
+def test_provider_partial_failure_recovery_preserves_ambiguity_when_state_is_unknown():
+    state = {"resource": "unknown"}
+
+    def operation():
+        state["resource"] = "unknown"
+        raise RuntimeError("provider failed after side effect")
+
+    result = execute_with_postcondition(
+        operation,
+        lambda: state["resource"] == "released",
+    )
+
+    assert result.status is RecoveryStatus.AMBIGUOUS
+    assert state["resource"] == "unknown"
