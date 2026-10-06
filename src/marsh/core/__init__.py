@@ -30,11 +30,13 @@ from marsh.core.ir import (
 from marsh.core.runtime import ExecutionPlan, LocalMachine, LocalProcess, SequentialScheduler, execute_workflow, execute_workflow_async, plan_workflow
 from marsh.core.policies import ExecutionPolicy, FailurePolicy, ResourcePolicy, RetryPolicy, TimeoutPolicy
 from marsh.core.providers import (
+    CapabilityDiscovery,
+    CapabilityMatch,
+    CapabilityRequirement,
+    CapabilityState,
     LocalProvider,
     Provider,
     ProviderCapabilities,
-    CapabilityMatch,
-    CapabilityRequirement,
     ProviderConfig,
     ProviderConfigurationError,
     ProviderError,
