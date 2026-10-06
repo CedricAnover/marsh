@@ -79,3 +79,39 @@ def test_local_provider_conformance_cancellation_is_confirmed(local_provider):
 
     assert result.status is ProcessStatus.CANCELLED
     assert result.metadata["cancellation"] == "confirmed"
+
+
+@pytest.mark.parametrize(
+    "provider_factory",
+    [
+        pytest.param(lambda: LocalProvider(), id="local"),
+        pytest.param(
+            lambda: __import__("marsh.providers.docker_provider", fromlist=["DockerProvider"]).DockerProvider(
+                image="python:3.12-slim"
+            ),
+            id="docker",
+        ),
+    ],
+)
+def test_provider_conformance_matrix_has_equivalent_capability_admission(provider_factory):
+    provider = provider_factory()
+    registry = ProviderRegistry({getattr(provider, "name", "provider"): provider})
+    name = getattr(provider, "name", "provider")
+
+    match = registry.negotiate(name, {"machine.create", "process.start", "process.wait"})
+
+    assert match.satisfied
+    assert match.state.value == "supported"
+    assert match.to_dict()["provider"] == name
+
+
+def test_provider_conformance_matrix_preserves_provider_unavailability():
+    from marsh.providers.docker_provider import DockerProvider
+
+    provider = DockerProvider()
+    registry = ProviderRegistry({"docker": provider})
+
+    match = registry.negotiate("docker", {"machine.create"})
+
+    assert match.state.value == "supported"
+    assert match.missing == frozenset()
