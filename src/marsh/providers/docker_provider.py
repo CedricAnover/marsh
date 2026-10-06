@@ -211,6 +211,30 @@ class DockerMachine:
     def __init__(self, config: DockerProviderConfig):
         self.config = config
 
+    @property
+    def machine_id(self) -> str:
+        return f"docker:{self.config.image}"
+
+    @property
+    def capabilities(self) -> frozenset[str]:
+        return frozenset(
+            {
+                "machine.create",
+                "process.start",
+                "process.wait",
+                "process.poll",
+                "process.stop",
+                "process.terminate",
+                "process.kill",
+                "process.cancel",
+                "process.result",
+            }
+        )
+
+    @property
+    def connection(self):
+        return None
+
     def create_process(self, spec: ProcessSpec) -> DockerProcess:
         return DockerProcess(spec, self.config)
 

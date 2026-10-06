@@ -23,10 +23,12 @@ deeper user and developer guidance.
 - [CLI](reference/cli.md) — `marsh inspect`, deterministic JSON output, and `marsh plugins list`.
 - [Extensions](reference/extensions.md) — `marsh.extensions` entry points and compatibility metadata.
 - [Workflow IR](reference/workflow-ir.md) — the versioned `marsh.workflow/v1` canonical representation.
+- [Remote execution](reference/remote-execution.md) — v0.4.1 machine, connection, substrate, agent, and reconciliation contracts.
 
 ## Releases
 
-- [v0.4.0 — Stable Workflow Kernel](releases/v0.4.0.md) — current development and release gates.
+- [v0.4.1 — Remote Execution Readiness](releases/v0.4.1.md) — current development and release gates.
+- [v0.4.0 — Stable Workflow Kernel](releases/v0.4.0.md) — prior semantic-kernel release.
 - [v0.3.9 — UX & Extension Convergence](releases/v0.3.9.md)
 - [v0.3.8 — Artifacts & Reproducibility](releases/v0.3.8.md)
 
