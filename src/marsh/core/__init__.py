@@ -52,3 +52,14 @@ from marsh.core.identity import canonical_bytes, content_digest, execution_id
 from marsh.core.inspection import inspect_workflow
 
 from marsh.core.recovery import RecoveryResult, RecoveryStatus, execute_with_postcondition
+
+from marsh.core.remote import (
+    Agent,
+    ExecutionRequest,
+    ExecutionResponse,
+    ExecutionSubstrate,
+    MachineConnection,
+    RemoteExecutionError,
+    SocketMachineConnection,
+    reconcile_remote_result,
+)

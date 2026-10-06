@@ -98,6 +98,16 @@ The kernel remains standard-library-first. Optional infrastructure dependencies 
 - mandatory new runtime dependencies;
 - generalized persistence/event sourcing.
 
-## v0.4.1 boundary
+## v0.4.1 remote boundary
 
-v0.4.1 may define and implement the minimum remote transport boundary only after these semantics are executable and conformance-tested. Remote execution must preserve the same identity, lifecycle, ambiguity, cancellation, artifact, and reconciliation vocabulary rather than redefine it.
+v0.4.1 implements the minimum transport-neutral remote boundary:
+
+- `MachineConnection` owns connection/session mechanics;
+- `ExecutionSubstrate` describes machine-side execution capability;
+- `Agent` is an optional machine-side execution endpoint;
+- `ExecutionRequest` and `ExecutionResponse` preserve execution and attempt identity;
+- `reconcile_remote_result()` refuses to infer failure or success from a transport interruption alone.
+
+The reference `SocketMachineConnection` uses standard-library TCP/JSON framing for conformance evidence only. It is not a production transport commitment.
+
+Remote execution must preserve the same identity, lifecycle, ambiguity, cancellation, artifact, and reconciliation vocabulary rather than redefine it.

@@ -34,6 +34,66 @@ The existing command and DAG APIs remain useful low-level building blocks and co
 
 This document describes the architecture implemented by the current Alpha release. Future capabilities are described only as extension boundaries and are not presented as implemented features.
 
+### Remote execution boundary (v0.4.1)
+
+v0.4.1 adds a transport-neutral boundary without introducing a second runtime or selecting a production distributed transport.
+
+```mermaid
+classDiagram
+    Workflow --> ExecutionPlan
+    ExecutionPlan --> Scheduler
+    Scheduler --> Machine
+    Machine --> Process
+    Process --> Result
+    Machine --> ExecutionSubstrate
+    Machine --> MachineConnection
+    MachineConnection --> ExecutionRequest
+    MachineConnection --> ExecutionResponse
+    ExecutionRequest --> ProcessSpec
+    ExecutionResponse --> Result
+    MachineConnection ..> Agent
+    Agent ..> ExecutionRequest
+    Agent ..> ExecutionResponse
+
+    class MachineConnection {
+        <<protocol>>
+        +connect()
+        +disconnect()
+        +execute(request)
+    }
+    class ExecutionSubstrate {
+        <<protocol>>
+        +machine_id
+        +capabilities
+        +connection
+    }
+    class Agent {
+        <<protocol>>
+        +execute(request)
+    }
+```
+
+Semantic flow:
+
+```text
+Workflow / Task
+    -> canonical execution identity
+    -> attempt identity
+    -> ExecutionRequest
+    -> MachineConnection
+    -> optional Agent / ExecutionSubstrate
+    -> Process
+    -> Result
+    -> ExecutionResponse
+
+Transport failure
+    -> authoritative result available?
+        yes -> reconcile to observed result
+        no  -> preserve ambiguous state
+```
+
+The current `SocketMachineConnection` is a small reference/conformance adapter. It deliberately does not define Marsh production transport architecture.
+
 ### Scheduler state machine (v0.3.5)
 
 The canonical runtime now uses one shared scheduler state model across sequential and bounded-concurrency modes:
