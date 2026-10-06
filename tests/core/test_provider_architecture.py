@@ -248,3 +248,21 @@ def test_provider_configuration_is_not_logged_by_default(caplog):
         )
 
     assert secret not in caplog.text
+
+
+def test_docker_provider_reports_unavailable_when_optional_dependency_is_missing(monkeypatch):
+    from marsh.providers.docker_provider import DockerProvider
+
+    real_import = __import__
+
+    def guarded_import(name, *args, **kwargs):
+        if name == "docker" or name.startswith("docker."):
+            raise ModuleNotFoundError("docker intentionally unavailable")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.__import__", guarded_import)
+
+    discovery = DockerProvider().discover_capabilities()
+
+    assert discovery.state is CapabilityState.UNAVAILABLE
+    assert "docker" in (discovery.reason or "")
