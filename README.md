@@ -6,7 +6,7 @@ Marsh separates **workflow definition** from **execution**. Work can be represen
 
 The project is evolving toward a small, dependency-light workflow and execution kernel while preserving its existing command, executor, and DAG APIs.
 
-> **Current release status:** the stable semantic-kernel/conformance contract is implemented and release validation is in progress. See [the semantic contract](docs/concepts/semantic-contracts.md) and [the release gates](docs/releases/).
+> **Current release:** v0.4.1 — remote execution readiness. Marsh now exposes a transport-neutral remote execution boundary with machine connection, optional agent, execution substrate, identity-preserving requests, and ambiguity-safe reconciliation. See [the semantic contract](docs/concepts/semantic-contracts.md) and [the v0.4.1 release notes](docs/releases/v0.4.1.md).
 
 > **Project status:** Alpha
 
@@ -29,12 +29,12 @@ Marsh currently supports:
 - Python 3.11
 - Python 3.12
 
-The current package has runtime dependencies on:
+The core package has no runtime dependencies. Optional integrations are available through extras:
 
-- Fabric
-- Docker
+- `marsh-lib[ssh]` — Fabric-based SSH integration.
+- `marsh-lib[docker]` — Docker integration.
 
-These dependencies support the existing SSH and Docker integrations.
+The v0.4.1 remote boundary is transport-neutral; it does not require a remote transport dependency in core.
 
 ## Installation
 
@@ -100,6 +100,20 @@ print(result.stdout.decode().strip())
 ```
 
 A complete runnable example is available in [`samples/workflow_ir_sample.py`](samples/workflow_ir_sample.py).
+
+## Remote execution readiness
+
+v0.4.1 defines the semantic boundary required for remote execution without committing Marsh to a production transport. The boundary separates:
+
+- `Machine` — execution environment;
+- `MachineConnection` — transport/session concerns;
+- `ExecutionSubstrate` — machine-side execution capability;
+- `Agent` — optional machine-side execution endpoint;
+- `ExecutionRequest` / `ExecutionResponse` — identity-preserving boundary messages.
+
+Remote failures are not automatically classified as process failures. If a transport failure occurs without authoritative execution evidence, Marsh preserves an ambiguous outcome instead of guessing.
+
+A small standard-library TCP adapter is included as a conformance/reference mechanism. It is evidence for the boundary, not a production transport commitment.
 
 ## Core concepts
 

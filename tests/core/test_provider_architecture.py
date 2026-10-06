@@ -14,6 +14,7 @@ from marsh.core.providers import (
     UnsupportedCapabilityError,
 )
 from marsh.core.runtime import execute_workflow
+from marsh.core.remote import ExecutionSubstrate
 
 
 def test_provider_config_normalizes_name_and_options():
@@ -179,6 +180,9 @@ def test_docker_provider_config_options_materialize_machine():
     )
 
     assert isinstance(machine, DockerMachine)
+    assert isinstance(machine, ExecutionSubstrate)
+    assert machine.machine_id == "docker:ubuntu:24.04"
+    assert "process.start" in machine.capabilities
     assert machine.config.image == "ubuntu:24.04"
     assert machine.config.client_kwargs == {"timeout": 5}
 
