@@ -202,3 +202,130 @@ def test_provider_discovery_exceptions_become_indeterminate():
     assert match.reason == "discovery failed"
     with pytest.raises(UnsupportedCapabilityError):
         registry.require("failing", {"process.start"})
+
+
+class _ConformanceMachine:
+    def __init__(self, result):
+        self.result = result
+
+    def create_process(self, spec):
+        return _ConformanceProcess(self.result)
+
+
+class _ConformanceProcess:
+    def __init__(self, result):
+        self.result = result
+        self.started = False
+
+    def start(self):
+        self.started = True
+
+    def wait(self):
+        assert self.started
+        return self.result
+
+
+class _ConformanceProvider:
+    def __init__(self, discovery, result):
+        self._discovery = discovery
+        self._result = result
+
+    @property
+    def capabilities(self):
+        return self._discovery.capabilities
+
+    def discover_capabilities(self):
+        return self._discovery
+
+    def create_machine(self, **kwargs):
+        return _ConformanceMachine(self._result)
+
+
+@pytest.mark.parametrize(
+    "provider",
+    [
+        pytest.param(
+            LocalProvider(),
+            id="local",
+        ),
+        pytest.param(
+            _ConformanceProvider(
+                CapabilityDiscovery.supported(
+                    {"machine.create", "process.start", "process.wait", "process.result"}
+                ),
+                Result(stdout=b"reference", status=ProcessStatus.COMPLETED),
+            ),
+            id="reference",
+        ),
+    ],
+)
+def test_heterogeneous_provider_matrix_uses_one_canonical_contract(provider):
+    registry = ProviderRegistry({"provider": provider})
+
+    match = registry.negotiate(
+        "provider",
+        {"machine.create", "process.start", "process.wait"},
+    )
+
+    assert match.state is CapabilityState.SUPPORTED
+    assert match.satisfied
+    assert match.to_dict()["provider"] == "provider"
+
+
+@pytest.mark.parametrize(
+    "provider",
+    [
+        pytest.param(LocalProvider(), id="local"),
+        pytest.param(
+            _ConformanceProvider(
+                CapabilityDiscovery.supported({"machine.create", "process.start"}),
+                Result(stdout=b"reference"),
+            ),
+            id="reference",
+        ),
+    ],
+)
+def test_heterogeneous_provider_matrix_rejects_missing_capabilities_before_dispatch(
+    provider,
+):
+    registry = ProviderRegistry({"provider": provider})
+
+    match = registry.negotiate("provider", {"process.wait"})
+
+    assert match.state is CapabilityState.UNSUPPORTED
+    assert match.missing == frozenset({"process.wait"})
+    with pytest.raises(UnsupportedCapabilityError):
+        registry.require("provider", {"process.wait"})
+
+
+@pytest.mark.parametrize(
+    ("discovery", "expected_exception"),
+    [
+        (
+            CapabilityDiscovery.unavailable("dependency missing"),
+            ProviderUnavailableError,
+        ),
+        (
+            CapabilityDiscovery.indeterminate("observation interrupted"),
+            UnsupportedCapabilityError,
+        ),
+    ],
+)
+def test_heterogeneous_provider_matrix_preserves_uncertainty(
+    discovery, expected_exception
+):
+    registry = ProviderRegistry(
+        {
+            "uncertain": _ConformanceProvider(
+                discovery,
+                Result(status=ProcessStatus.UNKNOWN),
+            )
+        }
+    )
+
+    match = registry.negotiate("uncertain", {"process.start"})
+
+    assert match.state is discovery.state
+    assert not match.satisfied
+    with pytest.raises(expected_exception):
+        registry.require("uncertain", {"process.start"})
