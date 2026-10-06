@@ -8,6 +8,8 @@ The project is evolving toward a small, dependency-light workflow and execution 
 
 > **Current release:** v0.4.1 — remote execution readiness. Marsh now exposes a transport-neutral remote execution boundary with machine connection, optional agent, execution substrate, identity-preserving requests, and ambiguity-safe reconciliation. See [the semantic contract](docs/concepts/semantic-contracts.md) and [the v0.4.1 release notes](docs/releases/v0.4.1.md).
 
+> **v0.4.2 development:** provider capability discovery is being hardened around one normalized, provider-neutral contract. Capability negotiation now distinguishes supported, unsupported, unavailable, and indeterminate discovery states without introducing a new runtime or mandatory dependency.
+
 > **Project status:** Alpha
 
 ## Features

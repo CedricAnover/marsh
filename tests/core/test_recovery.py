@@ -115,3 +115,45 @@ def test_recovery_does_not_retry_non_transient_verification_failure(monkeypatch)
     assert result.error is verification_error
     assert verification_attempts == [1]
     assert sleeps == []
+
+
+def test_provider_partial_failure_restores_state_only_after_verified_postcondition():
+    state = {"resource": "allocated"}
+    cleanup_calls = []
+
+    def operation():
+        raise RuntimeError("provider failed after allocation")
+
+    def restore():
+        cleanup_calls.append(1)
+        state["resource"] = "released"
+
+    def verify():
+        return state["resource"] == "released"
+
+    restore()
+    result = execute_with_postcondition(operation, verify)
+
+    assert result.status is RecoveryStatus.RESOLVED
+    assert state["resource"] == "released"
+    assert cleanup_calls == [1]
+
+    # Reconciliation is idempotent when the desired postcondition already holds.
+    restore()
+    assert state["resource"] == "released"
+    assert cleanup_calls == [1, 1]
+
+
+def test_provider_partial_failure_stays_ambiguous_when_restoration_cannot_be_verified():
+    state = {"resource": "unknown"}
+
+    def operation():
+        raise RuntimeError("provider failed after side effect")
+
+    result = execute_with_postcondition(
+        operation,
+        lambda: state["resource"] == "released",
+    )
+
+    assert result.status is RecoveryStatus.AMBIGUOUS
+    assert state["resource"] == "unknown"
