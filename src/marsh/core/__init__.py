@@ -45,7 +45,17 @@ from marsh.core.providers import (
     UnsupportedCapabilityError,
 )
 from marsh.core.cache import Cache, CachePolicy, MemoryCache, cache_key_for_task
-from marsh.core.observability import EventType, Observer, RuntimeEvent, emit_event
+from marsh.core.observability import (
+    Diagnostic,
+    DiagnosticCode,
+    DiagnosticObserver,
+    EventType,
+    Observer,
+    OpenTelemetryObserver,
+    RuntimeEvent,
+    emit_diagnostic,
+    emit_event,
+)
 from marsh.core.scheduler import AsyncScheduler, ConcurrentScheduler, ExecutorScheduler, ProcessScheduler, SchedulerState, TaskState, ThreadScheduler
 
 from marsh.core.artifacts import Artifact, ArtifactRef, ArtifactStore, Provenance

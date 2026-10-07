@@ -11,8 +11,9 @@ deeper user and developer guidance.
 ## Concepts
 
 - [Architecture](concepts/architecture.md) — implemented architectural boundaries and semantic ownership.
-- [v0.4.0 semantic contract](concepts/semantic-contracts.md) — canonical semantic ownership, lifecycle, identity, capability, recovery, and conformance rules.
-- [Artifacts and reproducibility](concepts/artifacts-and-reproducibility.md) — execution/attempt/artifact identity, provenance, and content-addressed storage.
+- [Semantic contract](concepts/semantic-contracts.md) — canonical semantic ownership, lifecycle, identity, capability, recovery, and conformance rules.
+- [Artifacts and reproducibility](concepts/artifacts-and-reproducibility.md)
+- [Observability](concepts/observability.md) — correlated runtime events, diagnostics, redaction, and optional telemetry integration. — execution/attempt/artifact identity, provenance, and content-addressed storage.
 
 ## How-to guides
 
@@ -27,7 +28,9 @@ deeper user and developer guidance.
 
 ## Releases
 
-- [v0.4.1 — Remote Execution Readiness](releases/v0.4.1.md) — current development and release gates.
+- [Observability & Operational Readiness](releases/observability.md) — current release observability contract and verification scope.
+
+- [v0.4.1 — Remote Execution Readiness](releases/v0.4.1.md) — historical remote execution boundary.
 - [v0.4.0 — Stable Workflow Kernel](releases/v0.4.0.md) — prior semantic-kernel release.
 - [v0.3.9 — UX & Extension Convergence](releases/v0.3.9.md)
 - [v0.3.8 — Artifacts & Reproducibility](releases/v0.3.8.md)

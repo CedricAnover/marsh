@@ -34,9 +34,9 @@ The existing command and DAG APIs remain useful low-level building blocks and co
 
 This document describes the architecture implemented by the current Alpha release. Future capabilities are described only as extension boundaries and are not presented as implemented features.
 
-### Remote execution boundary (v0.4.1)
+### Remote execution boundary
 
-v0.4.1 adds a transport-neutral boundary without introducing a second runtime or selecting a production distributed transport.
+The implementation provides a transport-neutral boundary without introducing a second runtime or selecting a production distributed transport.
 
 ```mermaid
 classDiagram
@@ -212,7 +212,22 @@ Cancellation is a request followed by mechanism-specific stop/terminate/kill and
 The policy evaluator is pure and inspectable. Backend differences must not change the policy decision for the same policy, task metadata, outcome, and control history. Runtime-only callbacks such as cleanup functions remain outside the portable IR serialization boundary.
 
 
-## Recovery and postcondition boundary (v0.4.2)
+### Observability boundary
+
+Observability remains downstream of runtime semantics and does not introduce a second execution model.
+
+```mermaid
+flowchart LR
+    S[Canonical Runtime State] --> E[RuntimeEvent / Diagnostic]
+    E --> R[Central Redaction]
+    R --> O[Observer]
+    O --> OT[Optional OpenTelemetry API Adapter]
+    OT --> A[Application-owned SDK / Exporter]
+```
+
+Observers consume correlated evidence for workflow, task, execution, attempt, provider, and process identity. They cannot mutate execution semantics, and secret-bearing values are redacted before observer or exporter delivery.
+
+## Recovery and postcondition boundary
 
 Postcondition-based recovery is authoritative only when verification itself can tolerate the narrow transient boundary failure that interrupted the original operation. `execute_with_postcondition` never retries the operation blindly; it retries only explicitly classified transient verification exceptions within a bounded budget and delay. A verified postcondition resolves the operation, while retry exhaustion preserves the original operation failure as an ambiguous outcome.
 

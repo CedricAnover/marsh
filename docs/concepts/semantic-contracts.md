@@ -1,6 +1,6 @@
 # Semantic contract
 
-This document is the implementation contract for the v0.4.0 Stable Workflow Kernel. It freezes semantic ownership before v0.4.1 remote execution work.
+This document is the implementation contract for the current stable workflow kernel. It freezes semantic ownership across local and transport-neutral execution boundaries.
 
 ## Canonical ownership
 
@@ -32,7 +32,7 @@ Current terminal outcomes are:
 - `skipped`
 - `blocked`
 
-v0.4.0 adds explicit `unknown` and `ambiguous` observation states. They are unresolved states, not proof of success or failure, and therefore are not treated as terminal lifecycle completion. An infrastructure/provider error is not, by itself, proof that work did not complete.
+The kernel exposes explicit `unknown` and `ambiguous` observation states. They are unresolved states, not proof of success or failure, and therefore are not treated as terminal lifecycle completion. An infrastructure/provider error is not, by itself, proof that work did not complete.
 
 Non-negotiable invariants:
 
@@ -100,7 +100,7 @@ The kernel remains standard-library-first. Optional infrastructure dependencies 
 
 ## Remote boundary
 
-v0.4.1 implements the minimum transport-neutral remote boundary:
+The current implementation provides the minimum transport-neutral remote boundary:
 
 - `MachineConnection` owns connection/session mechanics;
 - `ExecutionSubstrate` describes machine-side execution capability;
@@ -128,7 +128,7 @@ Legacy providers exposing only `capabilities` remain compatible; the registry no
 
 ## Provider/adapter hardening
 
-v0.4.2 makes the capability and provider boundary implementation-backed across the supported provider surface.
+The provider and adapter boundary is implementation-backed across the supported provider surface.
 
 - CapabilityState distinguishes supported, unsupported, unavailable, and indeterminate discovery.
 - CapabilityDiscovery normalizes provider-specific discovery into a provider-neutral observation.
@@ -141,4 +141,11 @@ v0.4.2 makes the capability and provider boundary implementation-backed across t
 - Partial provider failure remains adapter-owned and uses the existing bounded postcondition-based recovery primitive; unresolved state remains ambiguous.
 - Provider handles and provider-specific configuration remain opaque to canonical capability serialization and semantic identity.
 
-The v0.4.2 boundary remains standard-library-first: Docker and Fabric remain optional integrations, and no production distributed transport or second runtime/scheduler is introduced.
+The provider boundary remains standard-library-first: Docker and Fabric remain optional integrations, and no production distributed transport or second runtime/scheduler is introduced.
+
+
+## Observability contract
+
+Observability is a downstream projection of canonical Workflow/Task/Execution/Attempt/Process/Result semantics. Runtime events carry correlated workflow, task, execution, attempt, provider, and process identities when evidence exists. Execution identity survives retries while attempt identity changes.
+
+Observers receive redacted copies of events and diagnostics. Observer failures cannot affect execution, and missing or conflicting evidence remains `UNKNOWN`/`AMBIGUOUS` rather than being converted into an invented terminal outcome.
