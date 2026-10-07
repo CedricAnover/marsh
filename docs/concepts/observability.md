@@ -60,6 +60,10 @@ observer = OpenTelemetryObserver()
 execute_workflow(workflow, observers=(observer,))
 ```
 
+## Compatibility
+
+The observer API is additive: existing observers continue to receive `RuntimeEvent` objects, while the event stream now carries richer correlation and lifecycle evidence. Consumers should key behavior from `event_type` and canonical status rather than assume a fixed event count.
+
 ## Example
 
 ```python
