@@ -6,7 +6,7 @@ Marsh separates **workflow definition** from **execution**. Work can be represen
 
 The project is evolving toward a small, dependency-light workflow and execution kernel while preserving its existing command, executor, and DAG APIs.
 
-> **Current release:** v0.4.2 — provider & adapter hardening. Marsh now normalizes provider capability discovery and negotiation, preserves explicit unavailable/indeterminate states, and strengthens heterogeneous provider conformance and optional-dependency isolation. See [the semantic contract](docs/concepts/semantic-contracts.md) and [the v0.4.2 release notes](docs/releases/v0.4.2.md).
+> **Current release:** v0.4.3 — observability & operational readiness. Marsh now exposes correlated runtime evidence, stable operational diagnostics, secret-safe observer boundaries, and an optional OpenTelemetry API adapter without adding a mandatory telemetry dependency. See [the semantic contract](docs/concepts/semantic-contracts.md) and [the observability documentation](docs/concepts/observability.md).
 
 > **Project status:** Alpha
 
@@ -114,6 +114,22 @@ v0.4.1 defines the semantic boundary required for remote execution without commi
 Remote failures are not automatically classified as process failures. If a transport failure occurs without authoritative execution evidence, Marsh preserves an ambiguous outcome instead of guessing.
 
 A small standard-library TCP adapter is included as a conformance/reference mechanism. It is evidence for the boundary, not a production transport commitment.
+
+## Observability
+
+Runtime observability is opt-in and downstream of canonical execution semantics. Events can correlate workflow, task, execution, attempt, provider, and process identities while preserving `UNKNOWN`/`AMBIGUOUS` evidence and redacting secrets before observers receive data. See [Observability](docs/concepts/observability.md).
+
+```python
+from marsh import execute_workflow
+
+class Printer:
+    def on_event(self, event):
+        print(event.to_dict())
+
+results = execute_workflow(workflow, observers=(Printer(),))
+```
+
+Observers cannot alter execution outcomes, and OpenTelemetry integration is optional through the API-only `OpenTelemetryObserver`. Applications own SDK/exporter configuration.
 
 ## Core concepts
 

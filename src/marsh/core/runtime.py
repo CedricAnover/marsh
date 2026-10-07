@@ -24,10 +24,19 @@ from marsh.core.domain import (
     Workflow,
     can_transition,
 )
-from marsh.core.observability import EventType, Observer, RuntimeEvent, emit_event
+from marsh.core.observability import (
+    Diagnostic,
+    DiagnosticCode,
+    EventType,
+    Observer,
+    RuntimeEvent,
+    emit_diagnostic,
+    emit_event,
+)
 from marsh.core.policies import ExecutionPolicy, evaluate_policy
 from marsh.core.remote import MachineConnection
 from marsh.core.scheduler import AsyncScheduler, ProcessScheduler, ThreadScheduler
+from marsh.core.providers import ProviderConfig, ProviderRegistry
 
 
 def _finalize_result(
@@ -342,6 +351,15 @@ class SequentialScheduler:
         return tuple(workflow.task(task_id) for task_id in plan.order)
 
 
+def _task_terminal_event(result: Result) -> EventType:
+    """Map a canonical task result to the stable task observation vocabulary."""
+    if result.status is ProcessStatus.TIMED_OUT:
+        return EventType.TASK_TIMED_OUT
+    if result.status is ProcessStatus.CANCELLED:
+        return EventType.TASK_CANCELLED
+    return EventType.TASK_FAILED if result.failed else EventType.TASK_COMPLETED
+
+
 def _execute_task(
     task: Task,
     machine: LocalMachine,
@@ -350,9 +368,12 @@ def _execute_task(
     cache: Cache | None = None,
     *,
     workflow_id: str = "",
-    workflow_execution_id: str = "",
+    workflow_execution_id: str | None = None,
     artifact_store: ArtifactStore | None = None,
+    provider_id: str | None = None,
+    notify=None,
 ) -> Result:
+    """Execute one task while projecting canonical attempt/process evidence."""
     operation = task.operation
     started_at = time.monotonic()
     idempotent = bool(task.metadata.get("idempotent", True))
@@ -375,7 +396,7 @@ def _execute_task(
     if policy.resources is not None:
         requested = task.metadata.get("resources", {})
         if not policy.resources.supports(requested):
-            return _finalize_result(
+            result = _finalize_result(
                 Result(
                     status=ProcessStatus.FAILED,
                     error=f"task {task.id!r} requests unsupported resources: {requested}",
@@ -387,6 +408,15 @@ def _execute_task(
                 attempt_id=None,
                 artifact_store=artifact_store,
             )
+            if notify is not None:
+                notify(
+                    EventType.PROVIDER_REJECTED,
+                    task_id=task.id,
+                    result=result,
+                    provider_id=provider_id,
+                    metadata={"reason": "unsupported_resources", "requested": requested},
+                )
+            return result
 
     def run_cleanup(attempt: int) -> tuple[bool, str | None]:
         if cleanup is None or not policy.cleanup.enabled:
@@ -397,7 +427,7 @@ def _execute_task(
         except Exception as exc:
             return False, str(exc)
 
-    def finish_attempt(result: Result, attempt: int) -> Result | None:
+    def finish_attempt(result: Result, attempt: int, attempt_id: str, process_id: str | None = None) -> Result | None:
         cleanup_ok, cleanup_error = run_cleanup(attempt)
         decision = evaluate_policy(
             policy,
@@ -409,23 +439,62 @@ def _execute_task(
         metadata = {
             **result.metadata,
             "attempt": attempt,
-            "attempt_id": f"{task.id}:{attempt}",
+            "attempt_id": attempt_id,
             "failure_class": decision.failure_class.value,
             "cleanup_succeeded": cleanup_ok,
         }
         if cleanup_error is not None:
             metadata["cleanup_error"] = cleanup_error
+            if notify is not None:
+                notify(
+                    EventType.OBSERVATION_CONFLICTING,
+                    task_id=task.id,
+                    attempt_id=attempt_id,
+                    process_id=process_id,
+                    result=result,
+                    provider_id=provider_id,
+                    metadata={"diagnostic_code": DiagnosticCode.CLEANUP_FAILURE.value},
+                )
         result = replace(result, metadata=metadata)
+        if notify is not None:
+            notify(
+                EventType.ATTEMPT_COMPLETED,
+                task_id=task.id,
+                attempt_id=attempt_id,
+                process_id=process_id,
+                result=result,
+                provider_id=provider_id,
+            )
         if decision.retry:
+            if notify is not None:
+                notify(
+                    EventType.TASK_RETRY_SCHEDULED,
+                    task_id=task.id,
+                    attempt_id=attempt_id,
+                    process_id=process_id,
+                    result=result,
+                    provider_id=provider_id,
+                    metadata={"next_attempt": attempt + 1},
+                )
             return None
-        return _finalize_result(
+        final = _finalize_result(
             result,
             workflow_id=workflow_id,
             execution_id_value=workflow_execution_id,
             task_id=task.id,
-            attempt_id=metadata["attempt_id"],
+            attempt_id=attempt_id,
             artifact_store=artifact_store,
         )
+        if notify is not None:
+            notify(
+                EventType.RESULT_MATERIALIZED,
+                task_id=task.id,
+                attempt_id=attempt_id,
+                process_id=process_id,
+                result=final,
+                provider_id=provider_id,
+            )
+        return final
 
     if isinstance(operation, ProcessSpec):
         if policy.timeout is not None:
@@ -433,10 +502,61 @@ def _execute_task(
         attempt = 0
         while True:
             attempt += 1
+            attempt_id = f"{task.id}:{attempt}"
+            if notify is not None:
+                notify(
+                    EventType.ATTEMPT_STARTED,
+                    task_id=task.id,
+                    attempt_id=attempt_id,
+                    provider_id=provider_id,
+                )
             process = machine.create_process(operation)
+            if notify is not None:
+                notify(
+                    EventType.PROCESS_CREATED,
+                    task_id=task.id,
+                    attempt_id=attempt_id,
+                    process_id=process.process_id,
+                    provider_id=provider_id,
+                    metadata={"process_handle": process.process_id},
+                )
             process.start()
+            if notify is not None:
+                notify(
+                    EventType.PROCESS_STARTED,
+                    task_id=task.id,
+                    attempt_id=attempt_id,
+                    process_id=process.process_id,
+                    provider_id=provider_id,
+                    status=process.status,
+                )
+                if process.status is ProcessStatus.RUNNING:
+                    notify(
+                        EventType.PROCESS_RUNNING,
+                        task_id=task.id,
+                        attempt_id=attempt_id,
+                        process_id=process.process_id,
+                        provider_id=provider_id,
+                        status=process.status,
+                    )
             result = process.wait()
-            final = finish_attempt(result, attempt)
+            terminal_event = {
+                ProcessStatus.COMPLETED: EventType.PROCESS_COMPLETED,
+                ProcessStatus.FAILED: EventType.PROCESS_FAILED,
+                ProcessStatus.CANCELLED: EventType.PROCESS_CANCELLED,
+                ProcessStatus.TIMED_OUT: EventType.PROCESS_TIMED_OUT,
+            }.get(result.status, EventType.PROCESS_UNKNOWN)
+            if notify is not None:
+                notify(
+                    terminal_event,
+                    task_id=task.id,
+                    attempt_id=attempt_id,
+                    process_id=process.process_id,
+                    provider_id=provider_id,
+                    status=result.status,
+                    result=result,
+                )
+            final = finish_attempt(result, attempt, attempt_id, process.process_id)
             if final is not None:
                 return final
 
@@ -444,13 +564,30 @@ def _execute_task(
         attempt = 0
         while True:
             attempt += 1
+            attempt_id = f"{task.id}:{attempt}"
+            if notify is not None:
+                notify(
+                    EventType.ATTEMPT_STARTED,
+                    task_id=task.id,
+                    attempt_id=attempt_id,
+                    provider_id=provider_id,
+                )
             try:
                 result = operation(task.inputs, dependency_results)
             except Exception as exc:
                 result = Result(status=ProcessStatus.FAILED, error=str(exc), duration=time.monotonic() - started_at)
+                if notify is not None:
+                    notify(
+                        EventType.OBSERVATION_CONFLICTING,
+                        task_id=task.id,
+                        attempt_id=attempt_id,
+                        provider_id=provider_id,
+                        result=result,
+                        metadata={"diagnostic_code": DiagnosticCode.PROVIDER_FAILURE.value},
+                    )
             if not isinstance(result, Result):
                 result = Result(status=ProcessStatus.FAILED, error="task operation must return a Result")
-            final = finish_attempt(result, attempt)
+            final = finish_attempt(result, attempt, attempt_id)
             if final is not None:
                 return final
 
@@ -483,8 +620,6 @@ def execute_workflow(
     if machine is not None and provider is not None:
         raise ValueError("machine and provider cannot both be supplied")
     if provider is not None:
-        from marsh.core.providers import ProviderConfig, ProviderRegistry
-
         registry = provider_registry or ProviderRegistry({"local": _LocalProvider()})
         config = provider if isinstance(provider, ProviderConfig) else ProviderConfig(str(provider))
         machine = registry.resolve(config).create_machine(**dict(config.options))
@@ -495,22 +630,65 @@ def execute_workflow(
     results: dict[str, Result] = {}
     workflow_execution_id = _workflow_execution_id(workflow, policy)
     sequence = 0
+    if provider is not None:
+        provider_id = getattr(provider, "name", None) if not isinstance(provider, ProviderConfig) else provider.name
+    elif isinstance(machine, LocalMachine):
+        provider_id = "local"
+    else:
+        provider_id = None
 
-    def notify(event_type: EventType, task_id: str | None = None, result: Result | None = None) -> None:
+    def notify(
+        event_type: EventType,
+        task_id: str | None = None,
+        result: Result | None = None,
+        *,
+        execution_id_value: str | None = None,
+        attempt_id: str | None = None,
+        process_id: str | None = None,
+        provider_id: str | None = provider_id,
+        status: ProcessStatus | None = None,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> None:
         nonlocal sequence
         sequence += 1
+        effective_status = status if status is not None else result.status if result is not None else None
         event = RuntimeEvent(
             sequence=sequence,
             event_type=event_type,
             workflow_id=workflow.id,
             task_id=task_id,
-            status=result.status if result is not None else None,
-            metadata=(dict(result.metadata) | {"duration": result.duration}) if result is not None else {},
+            execution_id=workflow_execution_id if execution_id_value is None else execution_id_value,
+            attempt_id=attempt_id or (result.attempt_id if result is not None else None),
+            provider_id=provider_id,
+            process_id=process_id,
+            status=effective_status,
+            metadata=(dict(result.metadata) | {"duration": result.duration} | dict(metadata or {})) if result is not None else dict(metadata or {}),
         )
         for observer in observers:
             emit_event(observer, event)
+            if hasattr(observer, "on_diagnostic") and metadata and metadata.get("diagnostic_code"):
+                try:
+                    code = DiagnosticCode(str(metadata["diagnostic_code"]))
+                except ValueError:
+                    code = DiagnosticCode.OBSERVATION_FAILURE
+                emit_diagnostic(
+                    observer,
+                    Diagnostic(
+                        code=code,
+                        message=str(metadata.get("diagnostic_message", event_type.value)),
+                        workflow_id=workflow.id,
+                        execution_id=workflow_execution_id,
+                        task_id=task_id,
+                        attempt_id=attempt_id,
+                        provider_id=provider_id,
+                        process_id=process_id,
+                        details=metadata,
+                    ),
+                )
 
     notify(EventType.WORKFLOW_STARTED)
+    if provider_id is not None:
+        notify(EventType.PROVIDER_SELECTED, metadata={"provider": provider_id})
 
     if isinstance(scheduler, (AsyncScheduler, ThreadScheduler, ProcessScheduler)):
         if isinstance(scheduler, AsyncScheduler):
@@ -521,6 +699,7 @@ def execute_workflow(
                 policy=policy,
                 workflow_id=workflow.id,
                 workflow_execution_id=workflow_execution_id,
+                provider_id=provider_id,
             )
         else:
             run_task = lambda task, dependencies: _execute_task(
@@ -532,6 +711,8 @@ def execute_workflow(
                 workflow_id=workflow.id,
                 workflow_execution_id=workflow_execution_id,
                 artifact_store=artifact_store,
+                provider_id=provider_id,
+                notify=notify,
             )
         results.update(
             scheduler.execute(
@@ -539,7 +720,7 @@ def execute_workflow(
                 run_task,
                 on_start=lambda task_id: notify(EventType.TASK_STARTED, task_id),
                 on_complete=lambda task_id, result: notify(
-                    EventType.TASK_TIMED_OUT if result.status is ProcessStatus.TIMED_OUT else EventType.TASK_CANCELLED if result.status is ProcessStatus.CANCELLED else EventType.TASK_FAILED if result.failed else EventType.TASK_COMPLETED,
+                    _task_terminal_event(result),
                     task_id,
                     result,
                 ),
@@ -592,10 +773,12 @@ def execute_workflow(
             workflow_id=workflow.id,
             workflow_execution_id=workflow_execution_id,
             artifact_store=artifact_store,
+            provider_id=provider_id,
+            notify=notify,
         )
         results[task.id] = result
         notify(
-            EventType.TASK_FAILED if result.failed else EventType.TASK_COMPLETED,
+            _task_terminal_event(result),
             task.id,
             result,
         )
@@ -622,6 +805,7 @@ def _execute_process_task(
     *,
     workflow_id: str,
     workflow_execution_id: str | None,
+    provider_id: str | None = None,
 ) -> Result:
     """Process-safe callback; no live machine, observer, or cache crosses the boundary."""
     return _execute_task(
@@ -633,6 +817,7 @@ def _execute_process_task(
         workflow_id=workflow_id,
         workflow_execution_id=workflow_execution_id,
         artifact_store=None,
+        provider_id=provider_id,
     )
 
 
@@ -652,8 +837,19 @@ async def execute_workflow_async(
     results: dict[str, Result] = {}
     workflow_execution_id = _workflow_execution_id(workflow, policy)
     sequence = 0
+    provider_id = "local" if isinstance(machine, LocalMachine) else None
 
-    def notify(event_type: EventType, task_id: str | None = None, result: Result | None = None) -> None:
+    def notify(
+        event_type: EventType,
+        task_id: str | None = None,
+        result: Result | None = None,
+        *,
+        attempt_id: str | None = None,
+        process_id: str | None = None,
+        provider_id: str | None = provider_id,
+        status: ProcessStatus | None = None,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> None:
         nonlocal sequence
         sequence += 1
         event = RuntimeEvent(
@@ -661,8 +857,12 @@ async def execute_workflow_async(
             event_type=event_type,
             workflow_id=workflow.id,
             task_id=task_id,
-            status=result.status if result is not None else None,
-            metadata={"duration": result.duration} if result is not None else {},
+            execution_id=workflow_execution_id,
+            attempt_id=attempt_id or (result.attempt_id if result is not None else None),
+            provider_id=provider_id,
+            process_id=process_id,
+            status=status if status is not None else result.status if result is not None else None,
+            metadata=(dict(result.metadata) | {"duration": result.duration} | dict(metadata or {})) if result is not None else dict(metadata or {}),
         )
         for observer in observers:
             emit_event(observer, event)
@@ -670,6 +870,8 @@ async def execute_workflow_async(
     async def run_task(task: Task, dependencies: Mapping[str, Result]) -> Result:
         operation = task.operation
         if callable(operation):
+            attempt_id = f"{task.id}:1"
+            notify(EventType.ATTEMPT_STARTED, task.id, attempt_id=attempt_id)
             value = operation(task.inputs, dependencies)
             if inspect.isawaitable(value):
                 value = await value
@@ -680,12 +882,14 @@ async def execute_workflow_async(
                     status=ProcessStatus.FAILED,
                     error="task operation must return a Result",
                 )
+            result = replace(result, metadata={**result.metadata, "attempt_id": attempt_id})
+            notify(EventType.ATTEMPT_COMPLETED, task.id, result, attempt_id=attempt_id)
             return _finalize_result(
                 result,
                 workflow_id=workflow.id,
                 execution_id_value=workflow_execution_id,
                 task_id=task.id,
-                attempt_id=result.metadata.get("attempt_id", f"{task.id}:1"),
+                attempt_id=attempt_id,
                 artifact_store=artifact_store,
             )
         return _execute_task(
@@ -697,15 +901,19 @@ async def execute_workflow_async(
             workflow_id=workflow.id,
             workflow_execution_id=workflow_execution_id,
             artifact_store=artifact_store,
+            provider_id=provider_id,
+            notify=notify,
         )
 
     notify(EventType.WORKFLOW_STARTED)
+    if provider_id is not None:
+        notify(EventType.PROVIDER_SELECTED, metadata={"provider": provider_id})
     results.update(await scheduler.execute(
         workflow,
         run_task,
         on_start=lambda task_id: notify(EventType.TASK_STARTED, task_id),
         on_complete=lambda task_id, result: notify(
-            EventType.TASK_FAILED if result.failed else EventType.TASK_COMPLETED,
+            _task_terminal_event(result),
             task_id,
             result,
         ),
