@@ -530,16 +530,16 @@ def _execute_task(
                     attempt_id=attempt_id,
                     process_id=getattr(process, "process_id", None),
                     provider_id=provider_id,
-                    status=process.status,
+                    status=getattr(process, "status", None),
                 )
-                if process.status is ProcessStatus.RUNNING:
+                if getattr(process, "status", None) is ProcessStatus.RUNNING:
                     notify(
                         EventType.PROCESS_RUNNING,
                         task_id=task.id,
                         attempt_id=attempt_id,
                         process_id=getattr(process, "process_id", None),
                         provider_id=provider_id,
-                        status=process.status,
+                        status=getattr(process, "status", None),
                     )
             result = process.wait()
             terminal_event = {
