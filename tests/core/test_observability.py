@@ -231,7 +231,10 @@ def test_execution_id_is_stable_for_equivalent_workflow_invocations():
         tasks=(
             Task(
                 id="task",
-                operation=lambda *_: Result(status=ProcessStatus.COMPLETED),
+                operation=ProcessSpec(
+                    executable=sys.executable,
+                    arguments=("-c", "print('stable')"),
+                ),
             ),
         ),
     )
