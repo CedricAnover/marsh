@@ -113,7 +113,7 @@ def test_runtime_event_redaction_covers_result_payload_and_authorization_forms()
         workflow_id="wf",
         result={
             "stdout": "Authorization: Bearer top-secret",
-            "credentials": {"password": "pw", "safe": "ok"},
+            "payload": {"password": "pw", "safe": "ok"},
             "items": [{"private_key": "private-key-secret", "value": "ok"}],
         },
     )
@@ -124,7 +124,7 @@ def test_runtime_event_redaction_covers_result_payload_and_authorization_forms()
     assert "top-secret" not in encoded
     assert "pw" not in encoded
     assert "private-key-secret" not in encoded
-    assert payload["result"]["credentials"]["safe"] == "ok"
+    assert payload["result"]["payload"]["safe"] == "ok"
 
 
 def test_diagnostic_has_correlation_and_safe_serialization():
