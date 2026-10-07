@@ -104,6 +104,5 @@ def test_secret_in_process_environment_never_reaches_observer():
     result = execute_workflow(workflow, observers=(Observer(),))["task"]
 
     assert result.ok
-    serialized = "
-".join(str(event.to_dict()) for event in events)
+    serialized = "\\n".join(str(event.to_dict()) for event in events)
     assert "integration-secret" not in serialized
