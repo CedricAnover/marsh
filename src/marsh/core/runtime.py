@@ -89,11 +89,13 @@ def _finalize_result(
 def _workflow_execution_id(
     workflow: Workflow,
     policy: ExecutionPolicy,
-) -> str | None:
+) -> str:
+    """Return deterministic semantic identity or a per-invocation fallback."""
     try:
-        return execution_id(workflow, policy=policy.to_mapping())
+        value = execution_id(workflow, policy=policy.to_mapping())
     except (TypeError, ValueError):
-        return None
+        value = None
+    return value or uuid.uuid4().hex
 
 
 class _LocalProvider:
@@ -516,9 +518,9 @@ def _execute_task(
                     EventType.PROCESS_CREATED,
                     task_id=task.id,
                     attempt_id=attempt_id,
-                    process_id=process.process_id,
+                    process_id=getattr(process, "process_id", None),
                     provider_id=provider_id,
-                    metadata={"process_handle": process.process_id},
+                    metadata={"process_handle": getattr(process, "process_id", None)},
                 )
             process.start()
             if notify is not None:
@@ -526,7 +528,7 @@ def _execute_task(
                     EventType.PROCESS_STARTED,
                     task_id=task.id,
                     attempt_id=attempt_id,
-                    process_id=process.process_id,
+                    process_id=getattr(process, "process_id", None),
                     provider_id=provider_id,
                     status=process.status,
                 )
@@ -535,7 +537,7 @@ def _execute_task(
                         EventType.PROCESS_RUNNING,
                         task_id=task.id,
                         attempt_id=attempt_id,
-                        process_id=process.process_id,
+                        process_id=getattr(process, "process_id", None),
                         provider_id=provider_id,
                         status=process.status,
                     )
@@ -551,12 +553,12 @@ def _execute_task(
                     terminal_event,
                     task_id=task.id,
                     attempt_id=attempt_id,
-                    process_id=process.process_id,
+                    process_id=getattr(process, "process_id", None),
                     provider_id=provider_id,
                     status=result.status,
                     result=result,
                 )
-            final = finish_attempt(result, attempt, attempt_id, process.process_id)
+            final = finish_attempt(result, attempt, attempt_id, getattr(process, "process_id", None))
             if final is not None:
                 return final
 
