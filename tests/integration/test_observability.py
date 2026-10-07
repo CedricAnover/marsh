@@ -30,6 +30,7 @@ def test_local_process_success_produces_correlated_lifecycle_evidence():
 
     assert results["task"].status is ProcessStatus.COMPLETED
     assert [event.event_type for event in task_events] == [
+        EventType.TASK_STARTED,
         EventType.ATTEMPT_STARTED,
         EventType.PROCESS_CREATED,
         EventType.PROCESS_STARTED,
