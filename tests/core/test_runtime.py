@@ -260,11 +260,15 @@ def test_execute_workflow_emits_ordered_observer_events_and_ignores_observer_err
     assert results["task"].ok
     assert [event.event_type for event in events] == [
         EventType.WORKFLOW_STARTED,
+        EventType.PROVIDER_SELECTED,
         EventType.TASK_STARTED,
+        EventType.ATTEMPT_STARTED,
+        EventType.ATTEMPT_COMPLETED,
+        EventType.RESULT_MATERIALIZED,
         EventType.TASK_COMPLETED,
         EventType.WORKFLOW_COMPLETED,
     ]
-    assert [event.sequence for event in events] == [1, 2, 3, 4]
+    assert [event.sequence for event in events] == list(range(1, 9))
 
 
 def test_execute_workflow_uses_opt_in_cache_only_for_successful_results():
