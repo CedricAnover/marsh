@@ -1,6 +1,7 @@
 import sys
 
 from marsh.core.domain import ProcessSpec, ProcessStatus, Task, Workflow
+from marsh.core.observability import EventType
 from marsh.core.runtime import execute_workflow
 
 
@@ -29,17 +30,14 @@ def test_local_process_success_produces_correlated_lifecycle_evidence():
 
     assert results["task"].status is ProcessStatus.COMPLETED
     assert [event.event_type for event in task_events] == [
-        event_type
-        for event_type in (
-            __import__("marsh.core.observability", fromlist=["EventType"]).EventType.ATTEMPT_STARTED,
-            __import__("marsh.core.observability", fromlist=["EventType"]).EventType.PROCESS_CREATED,
-            __import__("marsh.core.observability", fromlist=["EventType"]).EventType.PROCESS_STARTED,
-            __import__("marsh.core.observability", fromlist=["EventType"]).EventType.PROCESS_RUNNING,
-            __import__("marsh.core.observability", fromlist=["EventType"]).EventType.PROCESS_COMPLETED,
-            __import__("marsh.core.observability", fromlist=["EventType"]).EventType.ATTEMPT_COMPLETED,
-            __import__("marsh.core.observability", fromlist=["EventType"]).EventType.RESULT_MATERIALIZED,
-            __import__("marsh.core.observability", fromlist=["EventType"]).EventType.TASK_COMPLETED,
-        )
+        EventType.ATTEMPT_STARTED,
+        EventType.PROCESS_CREATED,
+        EventType.PROCESS_STARTED,
+        EventType.PROCESS_RUNNING,
+        EventType.PROCESS_COMPLETED,
+        EventType.ATTEMPT_COMPLETED,
+        EventType.RESULT_MATERIALIZED,
+        EventType.TASK_COMPLETED,
     ]
     assert all(event.execution_id == results["task"].execution_id for event in task_events)
     assert len({event.attempt_id for event in task_events if event.attempt_id}) == 1
@@ -71,12 +69,12 @@ def test_local_process_timeout_is_observable_without_changing_result_semantics()
 
     assert result.status is ProcessStatus.TIMED_OUT
     assert any(
-        event.event_type.value == "process.timed_out"
+        event.event_type is EventType.PROCESS_TIMED_OUT
         for event in events
         if event.task_id == "task"
     )
     assert any(
-        event.event_type.value == "task.timed_out"
+        event.event_type is EventType.TASK_TIMED_OUT
         for event in events
         if event.task_id == "task"
     )
@@ -106,5 +104,6 @@ def test_secret_in_process_environment_never_reaches_observer():
     result = execute_workflow(workflow, observers=(Observer(),))["task"]
 
     assert result.ok
-    serialized = "\n".join(str(event.to_dict()) for event in events)
+    serialized = "
+".join(str(event.to_dict()) for event in events)
     assert "integration-secret" not in serialized
