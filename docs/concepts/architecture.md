@@ -307,3 +307,33 @@ The runtime accepts an optional ArtifactStore. Without one, existing result stre
 ### Security boundary
 
 Portable provenance is allow-listed. It must not contain credentials, full environment dumps, arbitrary runtime objects, or storage implementation details. Artifact reads verify content identity and declared size before returning bytes.
+
+## Resource model (v0.4.4)
+
+The resource layer adds semantic infrastructure composition without changing the execution engine:
+
+```mermaid
+flowchart LR
+    W[Workflow / Task] --> P[Planning]
+    P --> RG[ResourceGraph]
+    RG --> R[Resource]
+    R --> RI[ResourceIdentity]
+    R --> L[Resource Lifecycle]
+    R --> RP[Optional ResourceProvider]
+    RP --> A[Provider / Adapter]
+    A --> M[Existing Machine / ArtifactStore]
+    P --> S[Existing Scheduler]
+    S --> M
+```
+
+Resource identity and lifecycle are provider-independent. Resource providers materialize mechanisms; the existing runtime and scheduler continue to own process execution and task readiness.
+
+A resource provider therefore extends the existing architecture rather than introducing another execution engine:
+
+```text
+Provider
+  -> existing machine/process capabilities
+  -> optional ResourceProvider capability
+       -> resource identity + lifecycle semantics
+       -> provider-specific realization
+```
