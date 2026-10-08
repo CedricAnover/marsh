@@ -150,7 +150,7 @@ Observability is a downstream projection of canonical Workflow/Task/Execution/At
 
 Observers receive redacted copies of events and diagnostics. Observer failures cannot affect execution, and missing or conflicting evidence remains `UNKNOWN`/`AMBIGUOUS` rather than being converted into an invented terminal outcome.
 
-## Resource semantics (v0.4.4)
+## Resource semantics
 
 Resources are a provider-independent semantic layer for independently identifiable, lifecycle-bearing capabilities. Resource identity is `ResourceIdentity(kind, name)` and is deliberately independent of runtime handles and storage locations.
 
