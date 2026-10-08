@@ -6,7 +6,7 @@ Marsh separates **workflow definition** from **execution**. Work can be represen
 
 The project is evolving toward a small, dependency-light workflow and execution kernel while preserving its existing command, executor, and DAG APIs.
 
-> **Current release:** v0.4.3 — observability & operational readiness. Marsh now exposes correlated runtime evidence, stable operational diagnostics, secret-safe observer boundaries, and an optional OpenTelemetry API adapter without adding a mandatory telemetry dependency. See [the semantic contract](docs/concepts/semantic-contracts.md) and [the observability documentation](docs/concepts/observability.md).
+> **Current release:** v0.4.4 — resource model & provider foundation. Marsh now provides stable resource identity, explicit resource lifecycle states, deterministic resource graphs, and an optional provider resource-capability contract while preserving the existing workflow/runtime/provider boundaries. See [the semantic contract](docs/concepts/semantic-contracts.md), [the architecture](docs/concepts/architecture.md), and [the extension guide](docs/reference/extensions.md).
 
 > **Project status:** Alpha
 
@@ -19,7 +19,9 @@ The project is evolving toward a small, dependency-light workflow and execution 
 - **Processors and modifiers** — add validation, logging, transformation, and other reusable command behavior.
 - **DAG workflows** — model dependencies with the existing DAG API.
 - **Multiple execution mechanisms** — local, SSH, Docker, and Python execution are available through existing APIs.
-- **Composable architecture** — workflow semantics are separated from execution mechanisms and policies.
+- **Composable architecture** — workflow semantics are separated from execution mechanisms, resources, policies, providers, and adapters.
+- **Resource model** — represent lifecycle-bearing infrastructure resources with stable identities and deterministic relationships.
+- **Provider resource capabilities** — providers may expose resource creation capabilities without moving provider-specific semantics into the workflow kernel.
 
 ## Requirements
 
@@ -100,6 +102,23 @@ print(result.stdout.decode().strip())
 ```
 
 A complete runnable example is available in [`samples/workflow_ir_sample.py`](samples/workflow_ir_sample.py).
+
+## Resources
+
+Resources are independently identifiable, lifecycle-bearing capabilities that can participate in planning and composition. Their semantic identity is a stable `ResourceIdentity(kind, name)`; provider-local handles, process IDs, paths, and other runtime details are not resource identity.
+
+```python
+from marsh import Resource, ResourceGraph, ResourceIdentity
+
+machine = Resource(ResourceIdentity("machine", "build"))
+graph = ResourceGraph()
+graph.add(machine)
+print(machine.identity.value)  # machine:build
+```
+
+Resource lifecycle evidence is explicit: `declared -> validated -> negotiated -> selected -> planned -> creating -> realized -> active -> releasing -> released`. Recovery uses explicit `recovering`, `unknown`, and `ambiguous` states rather than guessing after an interrupted operation.
+
+Resource providers are optional extensions to the existing provider boundary. A provider can implement `resource_capabilities` and `create_resource(...)`; existing `Provider` implementations remain valid without this optional contract.
 
 ## Remote execution readiness
 

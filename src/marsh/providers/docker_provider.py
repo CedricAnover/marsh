@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from marsh.core.domain import Machine, Process, ProcessSpec, ProcessStatus, Result, can_transition
+from marsh.core.domain import (
+    Machine,
+    ProcessSpec,
+    ProcessStatus,
+    Result,
+    can_transition,
+)
 from marsh.core.providers import (
     CapabilityDiscovery,
     ProviderCapabilities,
@@ -12,6 +18,7 @@ from marsh.core.providers import (
     ProviderError,
     ProviderUnavailableError,
 )
+from marsh.core.resources import Resource, ResourceIdentity, ResourceState
 
 
 @dataclass(frozen=True)
@@ -103,9 +110,7 @@ class DockerProcess:
             stdout = self._container.logs(stdout=True, stderr=False)
             stderr = self._container.logs(stdout=False, stderr=True)
             status = (
-                ProcessStatus.COMPLETED
-                if status_code == 0
-                else ProcessStatus.FAILED
+                ProcessStatus.COMPLETED if status_code == 0 else ProcessStatus.FAILED
             )
             error = (
                 None
@@ -263,6 +268,49 @@ class DockerProvider:
                 "process.result",
             }
         )
+
+    @property
+    def resource_capabilities(self) -> ProviderCapabilities:
+        return ProviderCapabilities(
+            {"resource.machine.create", "resource.machine.release"}
+        )
+
+    def create_resource(self, identity: ResourceIdentity, **kwargs) -> Resource:
+        if identity.kind != "machine":
+            raise ProviderConfigurationError(
+                f"docker provider cannot create {identity.kind!r} resources"
+            )
+        resource = Resource(
+            identity, metadata={"image": kwargs.get("image", self.config.image)}
+        )
+        for state in (
+            ResourceState.VALIDATED,
+            ResourceState.NEGOTIATED,
+            ResourceState.SELECTED,
+            ResourceState.PLANNED,
+            ResourceState.CREATING,
+            ResourceState.REALIZED,
+            ResourceState.ACTIVE,
+        ):
+            resource.transition(state)
+        return resource
+
+    def release_resource(
+        self, resource: ResourceProtocol, **kwargs
+    ) -> ResourceProtocol:
+        if kwargs:
+            raise ProviderConfigurationError(
+                f"unsupported docker resource options: {sorted(kwargs)}"
+            )
+        if resource.identity.kind != "machine":
+            raise ProviderConfigurationError(
+                f"docker provider cannot release {resource.identity.kind!r} resources"
+            )
+        if not isinstance(resource, Resource):
+            raise TypeError("docker resource release requires Marsh Resource")
+        resource.transition(ResourceState.RELEASING)
+        resource.transition(ResourceState.RELEASED)
+        return resource
 
     def discover_capabilities(self) -> CapabilityDiscovery:
         try:

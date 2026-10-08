@@ -8,6 +8,12 @@ from enum import Enum
 from typing import Any, Mapping, Protocol, runtime_checkable
 
 from marsh.core.domain import Machine
+from marsh.core.resources import (
+    Resource,
+    ResourceIdentity,
+    ResourceProtocol,
+    ResourceState,
+)
 
 
 class ProviderError(RuntimeError):
@@ -160,11 +166,25 @@ class Provider(Protocol):
     """Mechanism boundary for materializing execution machines."""
 
     @property
-    def capabilities(self) -> ProviderCapabilities:
-        ...
+    def capabilities(self) -> ProviderCapabilities: ...
 
-    def create_machine(self, **kwargs) -> Machine:
-        ...
+    def create_machine(self, **kwargs) -> Machine: ...
+
+
+@runtime_checkable
+class ResourceProvider(Protocol):
+    """Optional provider capability for lifecycle-bearing resources."""
+
+    @property
+    def resource_capabilities(self) -> ProviderCapabilities: ...
+
+    def create_resource(
+        self, identity: ResourceIdentity, **kwargs: Any
+    ) -> ResourceProtocol: ...
+
+    def release_resource(
+        self, resource: ResourceProtocol, **kwargs: Any
+    ) -> ResourceProtocol: ...
 
 
 class LocalProvider:
@@ -188,8 +208,50 @@ class LocalProvider:
             }
         )
 
+    @property
+    def resource_capabilities(self) -> ProviderCapabilities:
+        return ProviderCapabilities(
+            {"resource.machine.create", "resource.machine.release"}
+        )
+
     def discover_capabilities(self) -> CapabilityDiscovery:
         return CapabilityDiscovery.supported(self.capabilities)
+
+    def create_resource(self, identity: ResourceIdentity, **kwargs: Any) -> Resource:
+        if identity.kind != "machine":
+            raise UnsupportedCapabilityError(
+                f"local provider cannot create {identity.kind!r} resources"
+            )
+        if kwargs:
+            raise ProviderConfigurationError(
+                f"unsupported local resource options: {sorted(kwargs)}"
+            )
+        resource = Resource(identity)
+        resource.transition(ResourceState.VALIDATED)
+        resource.transition(ResourceState.NEGOTIATED)
+        resource.transition(ResourceState.SELECTED)
+        resource.transition(ResourceState.PLANNED)
+        resource.transition(ResourceState.CREATING)
+        resource.transition(ResourceState.REALIZED)
+        resource.transition(ResourceState.ACTIVE)
+        return resource
+
+    def release_resource(
+        self, resource: ResourceProtocol, **kwargs: Any
+    ) -> ResourceProtocol:
+        if kwargs:
+            raise ProviderConfigurationError(
+                f"unsupported local resource options: {sorted(kwargs)}"
+            )
+        if resource.identity.kind != "machine":
+            raise UnsupportedCapabilityError(
+                f"local provider cannot release {resource.identity.kind!r} resources"
+            )
+        if not isinstance(resource, Resource):
+            raise TypeError("local resource release requires Marsh Resource")
+        resource.transition(ResourceState.RELEASING)
+        resource.transition(ResourceState.RELEASED)
+        return resource
 
     def create_machine(self, **kwargs) -> Machine:
         from marsh.core.runtime import LocalMachine
@@ -252,7 +314,9 @@ class ProviderRegistry:
             return CapabilityDiscovery.unavailable("provider is not registered")
         return _discover(provider)
 
-    def find(self, capabilities: Iterable[str] = ()) -> tuple[tuple[str, Provider], ...]:
+    def find(
+        self, capabilities: Iterable[str] = ()
+    ) -> tuple[tuple[str, Provider], ...]:
         required = frozenset(capabilities)
         return tuple(
             (name, self._providers[name])

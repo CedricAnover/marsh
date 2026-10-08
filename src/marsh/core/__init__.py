@@ -41,6 +41,7 @@ from marsh.core.providers import (
     ProviderConfigurationError,
     ProviderError,
     ProviderRegistry,
+    ResourceProvider,
     ProviderUnavailableError,
     UnsupportedCapabilityError,
 )
@@ -75,3 +76,5 @@ from marsh.core.remote import (
     SocketMachineConnection,
     reconcile_remote_result,
 )
+
+from marsh.core.resources import ArtifactStoreResourceAdapter, Resource, ResourceGraph, ResourceIdentity, ResourceProtocol, ResourceState, can_transition_resource

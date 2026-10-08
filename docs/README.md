@@ -13,7 +13,9 @@ deeper user and developer guidance.
 - [Architecture](concepts/architecture.md) — implemented architectural boundaries and semantic ownership.
 - [Semantic contract](concepts/semantic-contracts.md) — canonical semantic ownership, lifecycle, identity, capability, recovery, and conformance rules.
 - [Artifacts and reproducibility](concepts/artifacts-and-reproducibility.md)
-- [Observability](concepts/observability.md) — correlated runtime events, diagnostics, redaction, and optional telemetry integration. — execution/attempt/artifact identity, provenance, and content-addressed storage.
+- [Observability](concepts/observability.md) — correlated runtime events, diagnostics, redaction, and optional telemetry integration.
+- [Artifacts and reproducibility](concepts/artifacts-and-reproducibility.md) — execution/attempt/artifact identity, provenance, and content-addressed storage.
+- [Resources](concepts/resources.md) — stable resource identity, lifecycle, graph semantics, and provider resource capabilities.
 
 ## How-to guides
 
@@ -27,6 +29,8 @@ deeper user and developer guidance.
 - [Remote execution](reference/remote-execution.md) — v0.4.1 machine, connection, substrate, agent, and reconciliation contracts.
 
 ## Releases
+
+- [v0.4.4 — Resource Model & Provider Foundation](releases/v0.4.4.md) — current resource and provider foundation.
 
 - [Observability & Operational Readiness](releases/observability.md) — current release observability contract and verification scope.
 

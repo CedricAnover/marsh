@@ -149,3 +149,22 @@ The provider boundary remains standard-library-first: Docker and Fabric remain o
 Observability is a downstream projection of canonical Workflow/Task/Execution/Attempt/Process/Result semantics. Runtime events carry correlated workflow, task, execution, attempt, provider, and process identities when evidence exists. Execution identity survives retries while attempt identity changes.
 
 Observers receive redacted copies of events and diagnostics. Observer failures cannot affect execution, and missing or conflicting evidence remains `UNKNOWN`/`AMBIGUOUS` rather than being converted into an invented terminal outcome.
+
+## Resource semantics (v0.4.4)
+
+Resources are a provider-independent semantic layer for independently identifiable, lifecycle-bearing capabilities. Resource identity is `ResourceIdentity(kind, name)` and is deliberately independent of runtime handles and storage locations.
+
+The resource lifecycle is explicit and deterministic:
+
+```text
+DECLARED -> VALIDATED -> NEGOTIATED -> SELECTED -> PLANNED -> CREATING
+    -> REALIZED -> ACTIVE -> RELEASING -> RELEASED
+    CREATING/RELEASING -> RECOVERING -> REALIZED/RELEASED
+                                      -> UNKNOWN/AMBIGUOUS
+```
+
+An interrupted operation must not be converted into a successful state without authoritative evidence. `UNKNOWN` and `AMBIGUOUS` preserve insufficient or conflicting evidence.
+
+`ResourceGraph` owns identity uniqueness, relationship references, deterministic lookup, and deterministic inspection. It does not own provider-specific topology semantics.
+
+`ResourceProvider` is an optional extension of the existing `Provider` boundary. It exposes resource capabilities and resource materialization without making resource creation mandatory for existing providers. Provider-specific configuration and handles remain behind adapters.
