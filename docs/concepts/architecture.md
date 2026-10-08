@@ -94,7 +94,7 @@ Transport failure
 
 The current `SocketMachineConnection` is a small reference/conformance adapter. It deliberately does not define Marsh production transport architecture.
 
-### Scheduler state machine (v0.3.5)
+### Scheduler state machine
 
 The canonical runtime now uses one shared scheduler state model across sequential and bounded-concurrency modes:
 
@@ -122,9 +122,7 @@ Scheduler state machine
   +<------------- Result / state ---------------+
 ```
 
-
-
-## Canonical Workflow IR (v0.3.6)
+## Canonical Workflow IR
 
 The canonical workflow boundary is versioned independently from the package release:
 
@@ -148,7 +146,7 @@ Existing Runtime / Scheduler
 
 The IR is provider-independent and does not introduce a second execution model. Workflow and task IDs are semantic identities; executable Python callables are represented by explicit `OperationRef` values rather than arbitrary live object state. Unsupported runtime values fail explicitly at the boundary.
 
-## Provider boundary (v0.3.4)
+## Provider boundary
 
 Providers are execution-mechanism adapters. Workflow intent, planning, scheduling, and policy semantics remain provider-independent.
 
@@ -198,8 +196,7 @@ execute_workflow(workflow, provider=config)
 
 A new backend should therefore add a Provider/Adapter and conformance tests rather than introduce provider-specific branching into Workflow or planning.
 
-
-## Runtime policy control (v0.3.7)
+## Runtime policy control
 
 Policies are declarative inputs to one backend-independent runtime-control boundary. The policy layer decides semantics; schedulers, providers, machines, and processes implement mechanisms.
 
@@ -210,7 +207,6 @@ The attempt lifecycle is: execute -> terminal outcome -> cleanup at most once ->
 Cancellation is a request followed by mechanism-specific stop/terminate/kill and confirmation. A cancellation request is not itself a confirmed CANCELLED result. Timeout cleanup completes before retry eligibility is evaluated.
 
 The policy evaluator is pure and inspectable. Backend differences must not change the policy decision for the same policy, task metadata, outcome, and control history. Runtime-only callbacks such as cleanup functions remain outside the portable IR serialization boundary.
-
 
 ### Observability boundary
 
@@ -245,7 +241,7 @@ operation()
                retries exhausted -> AMBIGUOUS(original operation failure)
 ```
 
-## Artifact and identity boundary (v0.3.8)
+## Artifact and identity boundary
 
 v0.3.8 extends the existing canonical Workflow IR and runtime rather than introducing a second execution engine.
 
@@ -308,7 +304,7 @@ The runtime accepts an optional ArtifactStore. Without one, existing result stre
 
 Portable provenance is allow-listed. It must not contain credentials, full environment dumps, arbitrary runtime objects, or storage implementation details. Artifact reads verify content identity and declared size before returning bytes.
 
-## Resource model (v0.4.4)
+## Resource model
 
 The resource layer adds semantic infrastructure composition without changing the execution engine:
 
