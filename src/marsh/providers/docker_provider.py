@@ -18,7 +18,12 @@ from marsh.core.providers import (
     ProviderError,
     ProviderUnavailableError,
 )
-from marsh.core.resources import Resource, ResourceIdentity, ResourceState
+from marsh.core.resources import (
+    Resource,
+    ResourceIdentity,
+    ResourceProtocol,
+    ResourceState,
+)
 
 
 @dataclass(frozen=True)
